@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hybrid Agent generated candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "task_id", "response", "model_id"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "response": {"type": "string", "minLength": 1},
+    "model_id": {"type": "string", "minLength": 1},
+    "generation_seed": {"type": "integer"},
+    "calibration_only": {"type": "boolean"}
+  }
+}

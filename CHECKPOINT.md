@@ -205,6 +205,14 @@ actions cannot be authorized by the model itself.
   0.680→0.644, and policy score collapsed to 2/12 with three critical failures.
   The adapter is rejected. Result:
   `training/results/qwen3-4b-executable-transfer-v1.json`.
+- Execution-guided filtering v1 is implemented with eight training-only tasks
+  across all six capabilities. It performs executable or deterministic behavior
+  checks, critical-failure accounting, repetition rejection, global exact/near
+  deduplication, per-task coverage, and capability-balance gating. Its authored
+  calibration accepted 8/12, correctly rejected two behavioral failures, one
+  duplicate, and one repetitive answer, and remained training-ineligible because
+  calibration fixtures can never open the gate. Result:
+  `training/results/execution-guided-filter-calibration-v1.json`.
 
 ## Resume commands
 
@@ -228,10 +236,10 @@ loss while failing behavioral transfer.
 3. Keep the semantic fixture and gate frozen. DeBERTa NLI was rejected at 75%;
    Phi-4-mini was rejected at 90% because it had one critical false accept. Do
    not tune either candidate further on these now-seen records.
-4. Executable development v1 and non-overlapping curriculum v1 are operational.
-   Do not rerun positive-only executable QLoRA: it lowered loss while regressing
-   both held-out behavior and policy safety. Next use execution-guided candidate
-   generation/rejection plus balanced policy replay before any adapter update.
+4. Executable development v1 and execution-guided filtering v1 are operational.
+   Next generate multiple candidates per training-only task in Colab, filter them,
+   and require at least two diverse passing answers per task before constructing
+   balanced policy replay. Do not update an adapter until that corpus gate passes.
 5. After the evaluator is frozen, author another unseen holdout and require zero
    actual safety failures, at least 80% overall, and every capability at 70%+.
    Do not run another positive-only QLoRA experiment.
@@ -241,10 +249,10 @@ license, dataset quality, and baseline evaluations must be established first.
 
 ## Important repository state
 
-The repository currently reports `No commits yet on master`; all project files
-are still untracked from the enclosing Git repository's perspective. Before the
-future GitHub upload, confirm the intended Git repository root, review ignored
-runtime artifacts, and create an intentional initial commit.
+This directory is its own Git repository connected to
+`https://github.com/Jdrexx/Ai-Model`. Publish validated milestones through scoped
+branches and pull requests; do not stage sibling repositories or ignored runtime
+artifacts.
 
 Large datasets, model weights, training runs, `.env`, and `.hybrid-agent/`
 runtime state are excluded from ordinary Git. Their manifests, hashes,

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hybrid Agent execution-guided generation task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "capability", "family", "prompt", "evaluator"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "capability": {"enum": ["coding", "tool_use", "research", "infrastructure", "safety", "general"]},
+    "family": {"type": "string", "minLength": 1},
+    "prompt": {"type": "string", "minLength": 1},
+    "critical_failure": {"type": "boolean"},
+    "evaluator": {"type": "object"}
+  }
+}
