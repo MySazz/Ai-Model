@@ -8,6 +8,8 @@ Training data stays separated by lifecycle:
 - `processed/`: generated normalized train/validation/test files
 - `manifests/`: source, license, ownership, and collection documentation
 - `evaluations/`: held-out capability tests that must never enter training
+- `generation/`: training-only generation tasks, raw candidate batches, and
+  filter-calibration fixtures that must remain distinct from evaluations
 - `licenses/`: license texts or usage approvals for incorporated datasets
 
 Large datasets must not be committed to ordinary Git. Commit their manifest,
@@ -26,3 +28,8 @@ Candidate records deliberately use `"reviewed": false`. Reviewers must check
 correctness, safety, provenance, license, clarity, and overlap with held-out
 evaluations before changing that field. The validator's resulting `reviewed`
 errors are an intentional workflow gate, not a reason to weaken validation.
+
+Generated candidates use `training/schemas/generated-candidate.schema.json` and
+are filtered with `scripts/filter_execution_guided_candidates.py`. Authored
+filter fixtures carry `calibration_only: true`; they can exercise the pipeline
+but can never open its training-ready gate.

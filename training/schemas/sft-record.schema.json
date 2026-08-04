@@ -61,7 +61,7 @@
           ]
         },
         "category": {
-          "enum": ["coding", "research", "vision", "infrastructure", "general"]
+          "enum": ["coding", "tool_use", "research", "vision", "infrastructure", "safety", "general"]
         },
         "reviewed": {
           "const": true

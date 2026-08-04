@@ -24,7 +24,9 @@ ALLOWED_LICENSES = {
     "proprietary-approved",
     "public-domain",
 }
-ALLOWED_CATEGORIES = {"coding", "tool_use", "research", "vision", "infrastructure", "general"}
+ALLOWED_CATEGORIES = {
+    "coding", "tool_use", "research", "vision", "infrastructure", "safety", "general"
+}
 NEAR_DUPLICATE_THRESHOLD = 0.8
 EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}(?!\d)")
@@ -439,6 +441,15 @@ def _validate_metadata(
             "error",
             "reviewed",
             "A human must set metadata.reviewed to true.",
+            record_id,
+        )
+    if metadata.get("calibration_only") is True:
+        _issue(
+            issues,
+            item,
+            "error",
+            "calibration_only",
+            "Calibration-only records cannot enter prepared training datasets.",
             record_id,
         )
     if "split_group" in metadata and (
