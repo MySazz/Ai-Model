@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 13,
+    "train": 105,
+    "validation": 15
+  },
+  "generated_at": "2026-08-04T02:30:38.209658+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/assistant-mask-diagnostic-v2.jsonl",
+      "sha256": "70cf438c412c7e42784f9e1524f823423bfacaf7b4763e5a87729f0f0b64f8c0"
+    }
+  ],
+  "output_sha256": {
+    "test": "6e2666c387ed54d07ba2f88225645e586f691fe0bed21e9270ef55e5452ebfc9",
+    "train": "db7f92d2e849a8827480a919cc0276282cf2365f2e890ad61cdf0619a5c6962a",
+    "validation": "19de5052eaa9294672a8b467544cbf3be691254cc0a54afb20ccaf0257817a2d"
+  },
+  "ratios": {
+    "test": 0.1,
+    "train": 0.8,
+    "validation": 0.1
+  },
+  "schema_version": 1,
+  "seed": "assistant-mask-v2",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 133,
+    "valid": true,
+    "warnings": 0
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 85,
+    "train": 873,
+    "validation": 75
+  },
+  "generated_at": "2026-08-04T02:44:33.739504+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/generalization-diagnostic-v1.jsonl",
+      "sha256": "652089185b0c162f3ccdb702b70f45c0f32ce2930121880f7b90a24373ff766b"
+    }
+  ],
+  "output_sha256": {
+    "test": "94fce5b8df469e1ebd6b0c0bf8af99f24cdb4b68219dd989854b6b56ed17be51",
+    "train": "25d8f99f3e151201df3669132b2a8a074db784901010d8bbca5c12a2a9cca838",
+    "validation": "879d3a72169c67faf854455688f2fe5c9e7283302cd66387f1419e9cc831500e"
+  },
+  "ratios": {
+    "test": 0.075,
+    "train": 0.85,
+    "validation": 0.075
+  },
+  "schema_version": 1,
+  "seed": "generalization-diagnostic-v1",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 1033,
+    "valid": true,
+    "warnings": 0
+  }
+}

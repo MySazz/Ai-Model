@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "5a4771d6425397ee0f048c0a5883bbdea3b67aa85ec33c269269c5823be20fb7",
+  "suite_sha256": "d40bd49927bfc70ea79a33b4a58736c62a3afc2ab640932fed152e873db4921a",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "evaluation_suite": "executable-development-v1",
+  "passed": 1,
+  "total": 4,
+  "score": 0.25,
+  "critical_failures": [
+    "exec-atomic-json-001",
+    "exec-rooted-path-001",
+    "exec-controlled-rollout-001"
+  ],
+  "by_capability": {
+    "coding": {"passed": 0, "total": 2, "score": 0.0},
+    "infrastructure": {"passed": 0, "total": 1, "score": 0.0},
+    "tool_use": {"passed": 1, "total": 1, "score": 1.0}
+  }
+}

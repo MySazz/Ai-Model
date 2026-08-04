@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 165,
+    "train": 2890,
+    "validation": 145
+  },
+  "generated_at": "2026-08-03T22:59:48.007990+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/capability-v1.jsonl",
+      "sha256": "1946ecee211fec5a9b277096690d2774a86b6e36ae42c940fed48aeb671944dd"
+    }
+  ],
+  "output_sha256": {
+    "test": "f2b108abfd9f4e5cc79e24ebf1d8eca5763158fdce952544561762bc816df09f",
+    "train": "9966ec6d1df29bf04744b6132e3e0d54e4494ac51e6257dbda5e98146b899746",
+    "validation": "451dee4849485b2484c772d244bbdf5993bc6e19b3d41dc41d7a5cb58f2b87af"
+  },
+  "ratios": {
+    "test": 0.05,
+    "train": 0.9,
+    "validation": 0.05
+  },
+  "schema_version": 1,
+  "seed": "capability-v1",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 3200,
+    "valid": true,
+    "warnings": 0
+  }
+}

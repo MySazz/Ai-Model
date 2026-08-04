@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "name": "capability-curriculum-v1",
+  "status": "authoring",
+  "minimum_accepted_records": 3000,
+  "target_accepted_records": 4000,
+  "maximum_accepted_records": 5000,
+  "targets": {
+    "coding": 1500,
+    "tool_use": 800,
+    "research": 550,
+    "infrastructure": 450,
+    "privacy_safety": 400,
+    "general": 300
+  },
+  "quality_gates": {
+    "approved_provenance_and_license": true,
+    "human_sample_review_per_batch": true,
+    "automated_schema_privacy_duplicate_checks": true,
+    "executable_validation_where_applicable": true,
+    "evaluation_contamination_check": true,
+    "minimum_executable_coding_fraction": 0.2,
+    "minimum_failed_tool_result_fraction": 0.3
+  },
+  "evaluation_policy": {
+    "development_suite": "datasets/evaluations/automated-development-v1.jsonl",
+    "final_suite_target_cases": 300,
+    "final_suite_must_be_frozen_before_candidate_training": true,
+    "final_suite_must_not_be_used_for_training_generation": true
+  },
+  "current_batches": [
+    {
+      "path": "datasets/candidates/coding-tool-v1-batch-001.jsonl",
+      "accepted_records": 12,
+      "role": "pipeline-calibration"
+    },
+    {
+      "path": "datasets/candidates/capability-v1.jsonl",
+      "accepted_records": 3200,
+      "role": "first-candidate",
+      "composition": {
+        "coding": 1500,
+        "tool_use": 1000,
+        "infrastructure": 700
+      }
+    }
+  ]
+}

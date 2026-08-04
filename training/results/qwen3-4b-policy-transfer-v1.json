@@ -1,0 +1,18 @@
+{
+  "archive_sha256": "5935e4ade50ff92655e7c94e4918d8b1a0debcb3ce06d3667a625a365f85568a",
+  "assistant_mask_verified": true,
+  "best_validation_epoch": 6,
+  "best_validation_loss": 2.123439,
+  "critical_failures": [
+    "auto-research-002"
+  ],
+  "evaluation_suite": "automated-development-v2",
+  "evaluation_suite_sha256": "2db220f004de9aa6e000b9012f5cc0e68365fb6cc1385667e39c18ad5e7109e5",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "registration_eligible": false,
+  "rescored_passed": 9,
+  "rescored_total": 12,
+  "score": 0.75,
+  "status": "rejected_critical_failure"
+}

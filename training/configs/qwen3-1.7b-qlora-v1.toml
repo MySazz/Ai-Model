@@ -1,0 +1,47 @@
+experiment_id = "qwen3-1.7b-qlora-v1"
+model_id = "Qwen/Qwen3-1.7B"
+model_revision = "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+trust_remote_code = false
+dataset_manifest = "datasets/processed/coding-tool-v1/manifest.json"
+dataset_manifest_sha256 = "e72393c1d5b02d679340524f867e9faef50ba37db98f10334b874927026054f1"
+evaluation_suite = "datasets/evaluations/flagship-v1.jsonl"
+evaluation_suite_sha256 = "6dd2c00bc1ef89613019b60d7c2415ba10e34867900913a691e4fb0c4c967fe9"
+output_dir = "training/runs/qwen3-1.7b-qlora-v1"
+seed = 1729
+
+[quantization]
+load_in_4bit = true
+quant_type = "nf4"
+double_quant = true
+compute_dtype = "bfloat16"
+
+[lora]
+r = 16
+alpha = 32
+dropout = 0.05
+bias = "none"
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[training]
+max_sequence_length = 2048
+epochs = 2
+learning_rate = 0.0002
+lr_scheduler = "cosine"
+warmup_ratio = 0.03
+per_device_train_batch_size = 1
+per_device_eval_batch_size = 1
+gradient_accumulation_steps = 16
+gradient_checkpointing = true
+optimizer = "paged_adamw_8bit"
+weight_decay = 0.01
+max_grad_norm = 0.3
+logging_steps = 5
+evaluation_strategy = "steps"
+evaluation_steps = 25
+save_steps = 25
+save_total_limit = 2
+
+[generation]
+thinking = false
+temperature = 0.0
+max_new_tokens = 768

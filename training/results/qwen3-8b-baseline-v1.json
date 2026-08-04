@@ -1,0 +1,9 @@
+{
+  "archive_sha256": "5035712626a147b3c90d638c434720faa66bb35e4e863ad53ff41c700b943d71",
+  "critical_failures": 5,
+  "evaluation_suite": "automated-development-v2",
+  "model_id": "Qwen/Qwen3-8B",
+  "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "registration_eligible": false,
+  "score": 0.08333333333333333
+}

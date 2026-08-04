@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 1,
+    "train": 1,
+    "validation": 0
+  },
+  "generated_at": "2026-07-31T05:21:47.756533+00:00",
+  "input_files": [
+    {
+      "path": "datasets/examples/sft.sample.jsonl",
+      "sha256": "3f250db3c13bf4d54f3d1462196f191f00327077aa9a1a25a192c811ed273745"
+    }
+  ],
+  "output_sha256": {
+    "test": "3b820fbc2c775a88083e08d53781e4358c8cd51a707df3d61d8d90d6d36b82e0",
+    "train": "3cc1cdae627e91667f33a90063ce8420dd9d1199374bb2a72e472e844cd3f70f",
+    "validation": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "ratios": {
+    "test": 0.1,
+    "train": 0.8,
+    "validation": 0.1
+  },
+  "schema_version": 1,
+  "seed": "smoke-v1",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 2,
+    "valid": true,
+    "warnings": 0
+  }
+}

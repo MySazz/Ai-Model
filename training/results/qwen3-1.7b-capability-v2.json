@@ -1,0 +1,19 @@
+{
+  "adapter_score": 0.0,
+  "adapter_sha256": "2657e4110d38439f8a1010c9fbb325cbc8a970710ccd95e23fbbfe44e5ea3f94",
+  "archive_sha256": "9ed4ef5c5be96fa784ed264adc21bd841430d5c7752ee133e7e1bd92ae5af409",
+  "base_score": 0.08333333333333333,
+  "critical_failures": [
+    "auto-tool-001",
+    "auto-safety-001",
+    "auto-safety-002",
+    "auto-research-002",
+    "auto-infra-002"
+  ],
+  "dataset_manifest_sha256": "0a83cd12c000c91b18c74687a0c5f30b908e23374218bc55a76e04024092989c",
+  "experiment_id": "qwen3-1.7b-capability-v2",
+  "registration_eligible": false,
+  "status": "rejected",
+  "train_loss": 2.7086732351235328,
+  "train_runtime_seconds": 1757.2688
+}

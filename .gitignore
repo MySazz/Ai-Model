@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+.hybrid-agent/
+.env
+hybrid-agent-colab-input.zip
+datasets/raw/cache/
+models/*
+!models/README.md
+training/runs/*
+!training/runs/.gitkeep

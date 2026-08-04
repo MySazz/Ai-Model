@@ -1,0 +1,11 @@
+{
+  "dataset_id": "hybrid-agent-examples-v1",
+  "description": "Human-authored examples for validating the local dataset pipeline.",
+  "intended_use": "Pipeline smoke tests only; not sufficient for model training.",
+  "license": "proprietary-approved",
+  "owner": "Jon and Johnnie",
+  "pii_reviewed": true,
+  "source_files": [
+    "datasets/examples/sft.sample.jsonl"
+  ]
+}

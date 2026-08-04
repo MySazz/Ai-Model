@@ -1,0 +1,19 @@
+{
+  "cases_scored": 0,
+  "dataset_manifest_sha256": "e72393c1d5b02d679340524f867e9faef50ba37db98f10334b874927026054f1",
+  "evaluation_suite_sha256": "6dd2c00bc1ef89613019b60d7c2415ba10e34867900913a691e4fb0c4c967fe9",
+  "evidence": [
+    "Qwen/Qwen3-1.7B at revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e is not present in ollama list.",
+    "nvidia-smi cannot communicate with the NVIDIA driver.",
+    "torch, transformers, peft, trl, and bitsandbytes are not installed."
+  ],
+  "experiment_id": "qwen3-1.7b-qlora-v1",
+  "kind": "base-model-baseline",
+  "model_id": "Qwen/Qwen3-1.7B",
+  "model_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+  "reason": "Pinned base model cannot be executed in the verified local environment without downloading model artifacts and installing a compatible ML stack; the detected NVIDIA driver is unavailable.",
+  "recorded_at": "2026-08-02T22:31:02.089602+00:00",
+  "schema_version": 1,
+  "score": null,
+  "status": "blocked"
+}

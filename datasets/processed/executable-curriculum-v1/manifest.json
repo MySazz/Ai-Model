@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "test": 4,
+    "train": 24,
+    "validation": 4
+  },
+  "generated_at": "2026-08-04T20:16:01.834996+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/executable-curriculum-v1.jsonl",
+      "sha256": "30e66afb915ebab5bc808e98076fbf838d781cdc4524f85f2a7276a6a37847e4"
+    }
+  ],
+  "output_sha256": {
+    "test": "1397a8ac9d61f7f8833e90ae4ecb5b240f34d4adec779f0123cfe388ec5d5096",
+    "train": "9b70a40d9821dfa0b9acc8d3fa6ca0874a106cc29efbae6aca5ee3d193a9478b",
+    "validation": "2498b90c22ab6ccc2caca7e9ce88ad8976f83f4473a8c882a7ad287472064ed8"
+  },
+  "ratios": {
+    "test": 0.125,
+    "train": 0.75,
+    "validation": 0.125
+  },
+  "schema_version": 1,
+  "seed": "executable-v1-4",
+  "split_strategy": {
+    "metadata_field": "split_group",
+    "type": "metadata_group"
+  },
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 32,
+    "valid": true,
+    "warnings": 0
+  }
+}

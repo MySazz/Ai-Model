@@ -1,0 +1,36 @@
+{
+  "counts": {
+    "code": 1500,
+    "infrastructure": 700,
+    "tool": 1000
+  },
+  "output": "datasets/candidates/capability-v1.jsonl",
+  "output_sha256": "1946ecee211fec5a9b277096690d2774a86b6e36ae42c940fed48aeb671944dd",
+  "records": 3200,
+  "review_method": "upstream-curated plus deterministic local format, privacy, length, duplicate, and evaluation-overlap filters",
+  "schema_version": 1,
+  "selection": "ascending SHA-256 of normalized source record after local quality filters",
+  "sources": [
+    {
+      "download_sha256": "58d136bb7ea8e4b7c5b6ef08831da905d0abfafeb56f8fa519083089dd6a210e",
+      "license": "Apache-2.0",
+      "name": "code",
+      "revision": "993cf40c2e806a2641f388fb4026f30c4c73dc97",
+      "url": "https://huggingface.co/datasets/flwrlabs/code-alpaca-20k/resolve/993cf40c2e806a2641f388fb4026f30c4c73dc97/code_alpaca_20k.json"
+    },
+    {
+      "download_sha256": "8a7f9113159588e99f71fa53af919184ef469b02b770f3f0a0c7252762381618",
+      "license": "Apache-2.0",
+      "name": "tool",
+      "revision": "ef3f5c4ce7cbf80b55f017fdb8695226cfad0976",
+      "url": "https://huggingface.co/datasets/Johin/function-calling-dataset/resolve/ef3f5c4ce7cbf80b55f017fdb8695226cfad0976/data/train.jsonl"
+    },
+    {
+      "download_sha256": "28a5ea7579d8e12821a89d29f2ba2be51499ce1741a711920a9866a7b607003e",
+      "license": "Apache-2.0",
+      "name": "infrastructure",
+      "revision": "bd57569ae3424607bf8a404e274429f2182f30ea",
+      "url": "https://huggingface.co/datasets/jalpan04/devops-sft-dataset/resolve/bd57569ae3424607bf8a404e274429f2182f30ea/train.jsonl"
+    }
+  ]
+}

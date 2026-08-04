@@ -1,0 +1,13 @@
+{
+  "archive_sha256": "85e691d9034a06747cd4ac3a492fa900d47b7c9f43dfe30e87015a864d83332f",
+  "fixture_sha256": "f7713b0c1f564ad8dd51c31272f73a94693b084e02bbeae4ebe33c7f57e5d38d",
+  "model_id": "microsoft/Phi-4-mini-instruct",
+  "model_revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+  "prompt_variant": "inert-data-hardened-majority-vote",
+  "records": 20,
+  "correct": 18,
+  "accuracy": 0.9,
+  "false_accepts": 1,
+  "parse_failures": 0,
+  "passed": false
+}

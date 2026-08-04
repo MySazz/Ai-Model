@@ -1,0 +1,14 @@
+{
+  "adapter_probe_recall": 0.5068757631257631,
+  "archive_sha256": "3924e9936728bb162ea996493836de2dbff6f069a75a1d89a4e6936100a6c38a",
+  "assistant_mask_verified": true,
+  "diagnostic_status": "failed_family_transfer",
+  "family_split": {
+    "test": 12,
+    "train": 72,
+    "validation": 12
+  },
+  "registration_eligible": false,
+  "transfer_critical_failures": 4,
+  "transfer_score": 0.3333333333333333
+}

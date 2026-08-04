@@ -1,0 +1,10 @@
+{
+  "archive_sha256": "30047704541697d79fcac686273dbab3cbee7d6872d5a7c6180829043d4e6190",
+  "critical_failures": 0,
+  "evaluation_suite": "automated-development-v2",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "registration_eligible": false,
+  "score": 0.5833333333333334,
+  "system_policy": true
+}

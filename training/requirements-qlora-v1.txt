@@ -1,0 +1,9 @@
+# Reference environment: Python 3.11, Linux, CUDA 12.4-compatible driver.
+# Install a CUDA-compatible PyTorch wheel separately before this file.
+accelerate==1.8.1
+bitsandbytes==0.46.1
+datasets==3.6.0
+peft==0.16.0
+safetensors==0.5.3
+transformers==4.53.1
+trl==0.19.1

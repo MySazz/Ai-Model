@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.hybrid-agent/schemas/sft-record.schema.json",
+  "title": "Hybrid Agent supervised fine-tuning record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "messages", "metadata"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "enum": ["system", "user", "assistant", "tool"]
+          },
+          "content": {
+            "type": "string",
+            "description": "May be empty only for assistant tool-call messages."
+          },
+          "name": {
+            "type": "string"
+          },
+          "tool_call_id": {
+            "type": "string"
+          },
+          "tool_calls": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["source", "license", "category", "reviewed"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "enum": [
+            "Apache-2.0",
+            "BSD-2-Clause",
+            "BSD-3-Clause",
+            "CC-BY-4.0",
+            "CC-BY-SA-4.0",
+            "MIT",
+            "proprietary-approved",
+            "public-domain"
+          ]
+        },
+        "category": {
+          "enum": ["coding", "research", "vision", "infrastructure", "general"]
+        },
+        "reviewed": {
+          "const": true
+        }
+      }
+    }
+  }
+}

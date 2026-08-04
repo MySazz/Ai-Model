@@ -1,0 +1,35 @@
+{
+  "adapter_model_sha256": "71c785c2b47575fa034ed9a28bc178a790b79d0d14b0883e29c5e44d8789108e",
+  "archive_name": "qwen3-1.7b-qlora-v1-results.zip",
+  "archive_sha256": "b624809f3fc8b46b0373df5726abeeb9ecdcec44859bda58e16e7695e1d8bfef",
+  "artifact_hashes_verified": 11,
+  "compute_dtype": "torch.bfloat16",
+  "dataset_manifest_sha256": "e72393c1d5b02d679340524f867e9faef50ba37db98f10334b874927026054f1",
+  "evaluation": {
+    "adapter_responses_generated": 0,
+    "base_responses_generated": 0,
+    "human_evaluation_required": false,
+    "score": null
+  },
+  "evaluation_suite_sha256": "6dd2c00bc1ef89613019b60d7c2415ba10e34867900913a691e4fb0c4c967fe9",
+  "experiment_id": "qwen3-1.7b-qlora-v1",
+  "gpu": "Tesla T4",
+  "imported_at": "2026-08-03",
+  "kind": "pipeline-calibration",
+  "model_id": "Qwen/Qwen3-1.7B",
+  "model_revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+  "python": "3.12.13",
+  "schema_version": 1,
+  "status": "pipeline-only",
+  "torch": "2.11.0+cu128",
+  "training": {
+    "epochs": 2.0,
+    "optimizer_steps": 2,
+    "total_flos": 34980473769984.0,
+    "train_loss": 6.1299896240234375,
+    "train_runtime_seconds": 33.0345,
+    "train_samples_per_second": 0.666,
+    "train_steps_per_second": 0.061
+  },
+  "verification": "Archive integrity, all manifest-listed adapter hashes, dataset manifest hash, evaluation suite hash, model identity, and training metadata verified."
+}
