@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "experiment": "qwen3-4b-execution-feedback-repair-v1",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "generation_seed": 20260804,
+  "samples_per_task": 4,
+  "maximum_repair_attempts": 2,
+  "base_candidates": 32,
+  "repair_candidates": 49,
+  "input_candidates": 81,
+  "accepted_candidates": 8,
+  "accepted_repair_candidates": 1,
+  "accepted_by_task": {
+    "gen-byte-commit-001": 1,
+    "gen-feedback-001": 3,
+    "gen-source-limit-001": 4
+  },
+  "missing_capabilities": ["infrastructure", "safety", "tool_use"],
+  "underfilled_tasks": [
+    "gen-archive-target-001",
+    "gen-audit-events-001",
+    "gen-byte-commit-001",
+    "gen-migration-001",
+    "gen-safe-cleanup-001",
+    "gen-secret-handling-001"
+  ],
+  "critical_failures_observed": 51,
+  "ready_for_training": false,
+  "tasks_sha256": "9e77918ea22afe145c79a147859eaed31bd86096404634a7c0abf7e1b85be9bb",
+  "input_bundle_sha256": "c6d5fc6d3d8365292a9c558cfe30e40fe54e6970641b2a8a3efb59aea2168932",
+  "result_archive_sha256": "a53cb2fd978d019d2f04686ec96881c6088d56aef79d1d590429e3ef5215a1d6",
+  "raw_candidates_sha256": "9f5b01d840ff361cd8b33776a0ce0eb0b979180e85e2636f7b187ced7fed96c5",
+  "repair_trace_sha256": "41f15722ad800966a3cdfbcd4f7d7726ffefc74d40c98f82f41eae22bb148e14",
+  "accepted_candidates_sha256": "121a9ab38da055fc3f74d4eb2af76e4368d137d20cec5b8b8d67f919c914095d",
+  "conclusion": "Bounded named-check feedback produced one accepted repair, on the general feedback task, but no accepted coding, infrastructure, safety, or tool-use repair. Do not promote this corpus."
+}
