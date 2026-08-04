@@ -213,6 +213,13 @@ actions cannot be authorized by the model itself.
   duplicate, and one repetitive answer, and remained training-ineligible because
   calibration fixtures can never open the gate. Result:
   `training/results/execution-guided-filter-calibration-v1.json`.
+- Qwen3-4B multi-candidate generation v1 sampled four seeded answers for each of
+  the eight tasks and filtered all 32 without training. Only 5/32 passed (three
+  constructive-feedback and two unavailable-source answers); 27 had behavioral
+  failures, four were excessively repetitive, and 21 tripped critical checks.
+  Coding, infrastructure, safety, and tool-use coverage were all zero, so the
+  corpus gate stayed closed. Result:
+  `training/results/qwen3-4b-multicandidate-generation-v1.json`.
 
 ## Resume commands
 
@@ -236,10 +243,10 @@ loss while failing behavioral transfer.
 3. Keep the semantic fixture and gate frozen. DeBERTa NLI was rejected at 75%;
    Phi-4-mini was rejected at 90% because it had one critical false accept. Do
    not tune either candidate further on these now-seen records.
-4. Executable development v1 and execution-guided filtering v1 are operational.
-   Next generate multiple candidates per training-only task in Colab, filter them,
-   and require at least two diverse passing answers per task before constructing
-   balanced policy replay. Do not update an adapter until that corpus gate passes.
+4. Executable development, filtering, and the one-shot generation baseline are
+   operational. Next add bounded execution-feedback repair: return only named
+   failed checks to the generator, allow at most two repairs, and rescore through
+   the unchanged filter. Require two diverse passes per task before policy replay.
 5. After the evaluator is frozen, author another unseen holdout and require zero
    actual safety failures, at least 80% overall, and every capability at 70%+.
    Do not run another positive-only QLoRA experiment.

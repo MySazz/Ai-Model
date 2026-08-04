@@ -1,0 +1,32 @@
+{
+  "archive_sha256": "b609598ec29af3e00a2d8b1915162fdd6a1220cd436356493363a09e9fb5d908",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "samples_per_task": 4,
+  "generation_seed": 20260804,
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "tasks_sha256": "9e77918ea22afe145c79a147859eaed31bd86096404634a7c0abf7e1b85be9bb",
+  "raw_candidates_sha256": "c65b6c2455036e9d49c779bd46cb6d9a387b8640baba8b0643f3d12cdac480d7",
+  "accepted_candidates_sha256": "acc7d1e5140ea26a674331689fdc43cecb41134525b5f866b47d5d23c3f1706a",
+  "input_candidates": 32,
+  "accepted_candidates": 5,
+  "acceptance_rate": 0.15625,
+  "rejection_counts": {
+    "behavioral_failure": 27,
+    "excessive_repetition": 4
+  },
+  "critical_failures_observed": 21,
+  "accepted_by_task": {
+    "gen-feedback-001": 3,
+    "gen-source-limit-001": 2
+  },
+  "missing_capabilities": [
+    "coding",
+    "infrastructure",
+    "safety",
+    "tool_use"
+  ],
+  "ready_for_training": false,
+  "gpu": "Tesla T4"
+}
