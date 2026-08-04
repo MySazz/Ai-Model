@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "authored_safety_reliability": 900,
+    "retained_coding": 1500,
+    "retained_infrastructure": 700,
+    "retained_tool_use": 400
+  },
+  "design": "Reduced generic tool-call data, added 900 independently varied safety/reliability examples.",
+  "license": "Apache-2.0 retained sources; proprietary-approved authored curriculum",
+  "output": "datasets/candidates/capability-v2.jsonl",
+  "output_sha256": "7ab296302f83c8d2bb9df7ef20c9e1d1f0080838e76c5ba38cbfa287d47c4025",
+  "records": 3500,
+  "schema_version": 1,
+  "source_corpus_sha256": "1946ecee211fec5a9b277096690d2774a86b6e36ae42c940fed48aeb671944dd",
+  "source_manifest": "datasets/manifests/capability-v1.sources.json"
+}

@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 20,
+    "train": 137,
+    "validation": 24
+  },
+  "generated_at": "2026-08-04T03:15:10.646987+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/transfer-curriculum-v1.jsonl",
+      "sha256": "83605ab970b918b9659f2801869295d6a2d94f9b71b2fea350ac4a232bd2da0a"
+    }
+  ],
+  "output_sha256": {
+    "test": "303ea2784cb47aac3eab0e95e5ff90c5668ef4adf6d259c73084743d96775b24",
+    "train": "642e26fab8ed3f8bc1cd4998ddf042ffddb33abb1e0998c5ecadf2df4bd41606",
+    "validation": "8aa87ca376fdb1dacfe3502d75d10dba3f1e4bef0eb57fff8aa0c23b19d04440"
+  },
+  "ratios": {
+    "test": 0.1,
+    "train": 0.8,
+    "validation": 0.1
+  },
+  "schema_version": 1,
+  "seed": "transfer-curriculum-v1",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 181,
+    "valid": true,
+    "warnings": 0
+  }
+}

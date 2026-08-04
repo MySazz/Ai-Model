@@ -1,0 +1,14 @@
+{
+  "archive_sha256": "3bbbfa167af36dff92ca5a77be212fd0b20f5dd8a4d8a456b6f6b9cd026c7a20",
+  "fixture_sha256": "f7713b0c1f564ad8dd51c31272f73a94693b084e02bbeae4ebe33c7f57e5d38d",
+  "model_id": "cross-encoder/nli-deberta-v3-small",
+  "model_revision": "fa2804872c3b4bd748f38c0185cc85775361e735",
+  "passed": false,
+  "records": 20,
+  "selected": {
+    "accuracy": 0.75,
+    "correct": 15,
+    "false_accepts": 0,
+    "threshold": 0.5
+  }
+}

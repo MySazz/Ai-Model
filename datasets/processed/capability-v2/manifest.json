@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 189,
+    "train": 3138,
+    "validation": 173
+  },
+  "generated_at": "2026-08-04T00:57:48.526094+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/capability-v2.jsonl",
+      "sha256": "7ab296302f83c8d2bb9df7ef20c9e1d1f0080838e76c5ba38cbfa287d47c4025"
+    }
+  ],
+  "output_sha256": {
+    "test": "1c9ed6b5f2b516944085a479cd0b74d31184ed27613fea5bd312ba8eaa67f26b",
+    "train": "7fdb1f99d8d8863b4ab0df12ab17aa8180498bb2ea351b9c6c2960d11dd971ed",
+    "validation": "ad1a9726f8e920718632e0620295d9cbf83ca729fadb14bf4fced31a0c0b468d"
+  },
+  "ratios": {
+    "test": 0.05,
+    "train": 0.9,
+    "validation": 0.05
+  },
+  "schema_version": 1,
+  "seed": "capability-v2-20260803",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 3500,
+    "valid": true,
+    "warnings": 0
+  }
+}

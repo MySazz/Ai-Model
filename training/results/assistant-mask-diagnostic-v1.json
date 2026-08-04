@@ -1,0 +1,14 @@
+{
+  "adapter_probe_recall": 0.4081135274136493,
+  "archive_sha256": "63dafe232a3e6b5f51446a0668ad723b169f1804fcda6fe1deafa2aa76758a4e",
+  "assistant_mask_verified": true,
+  "base_probe_recall": 0.1733447169996166,
+  "diagnostic_status": "failed_strict_threshold",
+  "probe_recall_improvement": 0.2347688104140327,
+  "required_probe_recall": 0.45,
+  "transfer_critical_failures": 4,
+  "transfer_score": 0.25,
+  "train_records": 101,
+  "train_runtime_seconds": 233.6673,
+  "validation_records": 7
+}

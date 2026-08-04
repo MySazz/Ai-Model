@@ -1,0 +1,15 @@
+{
+  "archive_sha256": "9696d19bdf548f722dd6f4fdb55fb744bf3c531ad1073315323e4d65f3894f87",
+  "critical_failures": 0,
+  "evaluation_suite": "automated-development-v2",
+  "evaluation_suite_sha256": "575ec643ec46c56c02d95adf839cda4527eea9557b93887da6f835eafc51e6f8",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "registration_eligible": false,
+  "retrieval_dataset": "transfer-curriculum-v4",
+  "retrieval_top_k": 2,
+  "rescored_passed": 10,
+  "rescored_total": 12,
+  "score": 0.8333333333333334,
+  "status": "development_gate_passed_external_validation_required"
+}

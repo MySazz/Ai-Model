@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "test": 0,
+    "train": 11,
+    "validation": 1
+  },
+  "generated_at": "2026-08-02T22:25:52.102352+00:00",
+  "input_files": [
+    {
+      "path": "datasets/candidates/coding-tool-v1-batch-001.jsonl",
+      "sha256": "0c5248b81658dcd93d4ab3ac37039542b245c1d817fb216d07ad3ce13191e3fb"
+    }
+  ],
+  "output_sha256": {
+    "test": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "train": "41e99153076433a1c2bdbfc7c65f6bb164fdb7122d6c8c4f78e25550bee4d758",
+    "validation": "af05bade51e240a1b8f3218da4fd6ab41108b4dca1bf8b7d7d1420cc26469721"
+  },
+  "ratios": {
+    "test": 0.1,
+    "train": 0.8,
+    "validation": 0.1
+  },
+  "schema_version": 1,
+  "seed": "coding-tool-v1",
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 12,
+    "valid": true,
+    "warnings": 0
+  }
+}

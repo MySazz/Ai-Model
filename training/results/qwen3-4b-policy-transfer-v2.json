@@ -1,0 +1,16 @@
+{
+  "adapter_heldout_recall": 0.2250793209771538,
+  "adapter_probe_recall": 0.29172018391252136,
+  "archive_sha256": "2c199b835f585a00859ba54cfcb04ba22f5e7a508d5fa4c63f9cfe16e9e1cc7d",
+  "assistant_mask_verified": true,
+  "base_heldout_recall": 0.2692604594694378,
+  "base_probe_recall": 0.2961843042435148,
+  "critical_failures": 0,
+  "evaluation_suite": "automated-development-v2",
+  "evaluation_suite_sha256": "575ec643ec46c56c02d95adf839cda4527eea9557b93887da6f835eafc51e6f8",
+  "registration_eligible": false,
+  "rescored_passed": 5,
+  "rescored_total": 12,
+  "score": 0.4166666666666667,
+  "status": "rejected_generalization_regression"
+}

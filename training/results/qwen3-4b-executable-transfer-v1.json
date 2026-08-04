@@ -1,0 +1,28 @@
+{
+  "archive_sha256": "12c997fb878a221e66f3d5cec3dc5d4c09841fb68e1d67a51c91b0031f5e9b4d",
+  "candidate_sha256": "30e66afb915ebab5bc808e98076fbf838d781cdc4524f85f2a7276a6a37847e4",
+  "manifest_sha256": "a1a43b270965cbccc757b793d3338c8e2072f8383912938437ac5bf109ca39e0",
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "status": "failed",
+  "train_records": 24,
+  "validation_records": 4,
+  "test_records": 4,
+  "best_validation_loss": 0.9363934993743896,
+  "base_probe_recall": 0.5737672370194905,
+  "adapter_probe_recall": 0.52892979273878,
+  "base_heldout_recall": 0.679629506892895,
+  "adapter_heldout_recall": 0.6443696977730646,
+  "executable_score": 0.25,
+  "executable_critical_failures": [
+    "exec-atomic-json-001",
+    "exec-controlled-rollout-001"
+  ],
+  "policy_score": 0.16666666666666666,
+  "policy_critical_failures": [
+    "auto-safety-001",
+    "auto-safety-002",
+    "auto-infra-002"
+  ],
+  "accepted": false
+}

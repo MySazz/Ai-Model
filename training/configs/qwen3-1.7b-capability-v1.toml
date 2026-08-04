@@ -1,0 +1,47 @@
+experiment_id = "qwen3-1.7b-capability-v1"
+model_id = "Qwen/Qwen3-1.7B"
+model_revision = "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+trust_remote_code = false
+dataset_manifest = "datasets/processed/capability-v1/manifest.json"
+dataset_manifest_sha256 = "bdb7de5ff61a38645c4b2b14e25dd757cddc6c832069da7c9f14cd0880f612f8"
+evaluation_suite = "datasets/evaluations/automated-development-v1.jsonl"
+evaluation_suite_sha256 = "a945eed6c8aeed54fba97dea7ae3b25b158e47717ceefe58636f1c30597a41d3"
+output_dir = "training/runs/qwen3-1.7b-capability-v1"
+seed = 1730
+
+[quantization]
+load_in_4bit = true
+quant_type = "nf4"
+double_quant = true
+compute_dtype = "bfloat16"
+
+[lora]
+r = 16
+alpha = 32
+dropout = 0.05
+bias = "none"
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+
+[training]
+max_sequence_length = 2048
+epochs = 1
+learning_rate = 0.0001
+lr_scheduler = "cosine"
+warmup_ratio = 0.03
+per_device_train_batch_size = 1
+per_device_eval_batch_size = 1
+gradient_accumulation_steps = 16
+gradient_checkpointing = true
+optimizer = "paged_adamw_8bit"
+weight_decay = 0.01
+max_grad_norm = 0.3
+logging_steps = 10
+evaluation_strategy = "steps"
+evaluation_steps = 50
+save_steps = 50
+save_total_limit = 2
+
+[generation]
+thinking = false
+temperature = 0.0
+max_new_tokens = 384

@@ -1,0 +1,28 @@
+{
+  "archive_sha256": "4e0ceba7b9c73493bbfae002042d8ba48f0fa04ee2f7b904fe093b5c17ea71e4",
+  "automated_critical_failures": 11,
+  "automated_passed": 23,
+  "automated_score": 0.38333333333333336,
+  "automated_total": 60,
+  "by_capability": {
+    "coding": 0.4,
+    "general": 1.0,
+    "infrastructure": 0.3,
+    "research": 0.4,
+    "safety": 0.1,
+    "tool_use": 0.4
+  },
+  "evaluation_suite": "automated-holdout-v3",
+  "evaluation_suite_sha256": "01810d0b7e6bbc213c1da585745fed10e54d7ecee13d11c1c52937a8ad7a7f07",
+  "manual_audit_of_flagged_critical_responses": {
+    "actual_unsafe": 0,
+    "audited": 11,
+    "finding": "All flagged responses were safe refusals; regex rubrics missed valid paraphrases or treated omitted rollout detail as critical."
+  },
+  "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+  "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "registration_eligible": false,
+  "retrieval_dataset": "transfer-curriculum-v4",
+  "retrieval_top_k": 2,
+  "status": "failed_untouched_holdout"
+}
