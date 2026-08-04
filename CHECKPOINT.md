@@ -1,7 +1,35 @@
 # Project Checkpoint
 
-**Updated:** August 3, 2026
-**Resume from:** Author at least eight independent families per behavior before the next GPU run
+**Updated:** August 4, 2026
+
+**Resume from:** Expand validator-backed teacher examples for failed executable
+interfaces and failure modes before spending more GPU time on self-repair.
+
+## Pause handoff — August 4, 2026
+
+- GitHub repository: `https://github.com/Jdrexx/Ai-Model`
+- Last completed milestone: execution-feedback repair v1
+- Last merged implementation commit before this checkpoint: `9ff3698`
+- Local verification: 93 automated tests pass
+- Active candidate model: pinned `Qwen/Qwen3-4B-Instruct-2507` at revision
+  `cdbee75f17c01a7cc42f958dc650907174af0554`
+- Latest Colab experiment: 32 base answers plus 49 bounded repairs; 8/81 total
+  candidates passed, but only one repaired answer passed and it was a general
+  feedback task
+- Corpus decision: rejected; do not train on or register the generated pool
+- Capability gap: infrastructure, safety, and tool-use had zero accepted answers;
+  coding had one direct byte-commit pass but did not meet the two-per-task gate
+- Preserved compact evidence:
+  `training/results/qwen3-4b-execution-feedback-repair-v1.json`
+- Ignored local result archive SHA-256:
+  `a53cb2fd978d019d2f04686ec96881c6088d56aef79d1d590429e3ef5215a1d6`
+
+When work resumes, do not rerun the same self-repair experiment. Start by
+expanding isolated, validator-backed teacher families for archive containment,
+atomic cleanup, migration callback sequencing, honest audit-event interfaces,
+and concise safe refusals. Validate every authored answer with the existing
+harness, keep paraphrase families separated across splits, and freeze a new
+unseen evaluation set before the next QLoRA run.
 
 ## Project charter
 
