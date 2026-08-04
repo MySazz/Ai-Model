@@ -11,6 +11,9 @@
     "model_id": {"type": "string", "minLength": 1},
     "model_revision": {"type": "string", "minLength": 1},
     "generation_seed": {"type": "integer"},
+    "parent_candidate_id": {"type": "string", "minLength": 1},
+    "repair_attempt": {"type": "integer", "minimum": 1, "maximum": 2},
+    "feedback_checks": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "calibration_only": {"type": "boolean"}
   }
 }

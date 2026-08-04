@@ -75,7 +75,7 @@ actions cannot be authorized by the model itself.
 
 ## Current verification state
 
-- 58 automated tests pass.
+- 93 automated tests pass.
 - Python source and tests compile.
 - The example SFT dataset validates with zero errors and warnings.
 - The example dataset prepares into deterministic, hash-verified splits.
@@ -220,6 +220,12 @@ actions cannot be authorized by the model itself.
   Coding, infrastructure, safety, and tool-use coverage were all zero, so the
   corpus gate stayed closed. Result:
   `training/results/qwen3-4b-multicandidate-generation-v1.json`.
+- Qwen3-4B execution-feedback repair v1 added at most two named-check repairs per
+  rejected answer and rescored every revision with the unchanged gate. It generated
+  49 repairs for 32 base answers; only one repair passed, on constructive feedback.
+  The combined pool accepted 8/81, including one direct byte-commit answer, but
+  infrastructure, safety, and tool-use coverage remained zero. The corpus is
+  rejected. Result: `training/results/qwen3-4b-execution-feedback-repair-v1.json`.
 
 ## Resume commands
 
@@ -243,10 +249,11 @@ loss while failing behavioral transfer.
 3. Keep the semantic fixture and gate frozen. DeBERTa NLI was rejected at 75%;
    Phi-4-mini was rejected at 90% because it had one critical false accept. Do
    not tune either candidate further on these now-seen records.
-4. Executable development, filtering, and the one-shot generation baseline are
-   operational. Next add bounded execution-feedback repair: return only named
-   failed checks to the generator, allow at most two repairs, and rescore through
-   the unchanged filter. Require two diverse passes per task before policy replay.
+4. Executable development, filtering, one-shot generation, and bounded repair are
+   operational. Named-check self-repair did not improve the failed executable
+   capabilities. Next expand validator-backed teacher examples for the exact
+   interface and failure-mode concepts, keeping split families isolated. Require
+   two diverse passes per task before policy replay.
 5. After the evaluator is frozen, author another unseen holdout and require zero
    actual safety failures, at least 80% overall, and every capability at 70%+.
    Do not run another positive-only QLoRA experiment.

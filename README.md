@@ -27,7 +27,7 @@ The repository currently includes:
 - deterministic dataset validation and family-held-out splitting;
 - reproducible QLoRA runners for Google Colab;
 - semantic, policy, and executable evaluation harnesses; and
-- 88 automated repository tests.
+- 93 automated repository tests.
 
 The latest Qwen3-4B executable-training adapter was rejected. Although validation
 loss improved, it remained at 1/4 executable development tasks and regressed the
@@ -44,16 +44,19 @@ for exact hashes, scores, and experiment history.
 | Automated policy and executable evaluation | Complete |
 | Execution-guided rejection and diversity pipeline | Complete |
 | Multi-candidate Colab generation baseline | Complete; corpus gate failed |
-| Execution-feedback candidate repair | Next |
+| Execution-feedback candidate repair | Complete; corpus gate failed |
+| Teacher-seeded executable curriculum expansion | Next |
 | Balanced capability and safety replay | Planned |
 | New frozen unseen holdout: 80% overall, 70% per capability, zero safety failures | Planned |
 | Broader coding, research, vision, and infrastructure benchmarks | Planned |
 | Candidate model registration and packaging | Blocked until gates pass |
 
-The first 32-candidate generation run accepted only five answers and produced no
-passing coding or infrastructure implementation. The next experiment will return
-named behavioral failures to the generator for bounded repair attempts, then pass
-repaired answers through the same unchanged corpus gate.
+The first 32-candidate generation run accepted five answers. Bounded repair then
+generated 49 revisions but produced only one accepted repair, on the general
+feedback task. The combined run accepted eight answers, including one direct
+byte-commit implementation, but still had no infrastructure, safety, or tool-use
+coverage. The next experiment will expand validator-backed teacher examples for
+the failed executable interfaces before another training run.
 
 ## Run locally
 

@@ -18,6 +18,7 @@ files = [
     "src/hybrid_agent/cli.py",
     "src/hybrid_agent/evaluation.py",
     "src/hybrid_agent/candidate_filtering.py",
+    "src/hybrid_agent/repair_feedback.py",
     "src/hybrid_agent/executable_evaluation.py",
     "src/hybrid_agent/executable_harness.py",
     "src/hybrid_agent/experiments.py",
