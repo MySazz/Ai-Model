@@ -14,7 +14,6 @@ from typing import Any
 
 from .evaluation import EvaluationError
 
-
 HARNESS_PATH = Path(__file__).with_name("executable_harness.py")
 
 
@@ -22,7 +21,7 @@ def extract_python(response: str) -> str:
     """Extract the largest Python fenced block, or accept an unfenced response."""
     blocks = re.findall(r"```(?:python|py)\s*\n(.*?)```", response, re.IGNORECASE | re.DOTALL)
     if blocks:
-        return max(blocks, key=len).strip() + "\n"
+        return str(max(blocks, key=len)).strip() + "\n"
     if "```" in response:
         raise EvaluationError("Response has code fences but no Python fenced block.")
     if not response.strip():
@@ -58,7 +57,7 @@ def run_python_checks(response: str, evaluator: dict[str, Any]) -> dict[str, boo
         submission = Path(directory) / "submission.py"
         submission.write_text(code, encoding="utf-8")
         try:
-            completed = subprocess.run(
+            completed = subprocess.run(  # noqa: S603 - fixed interpreter and harness argv
                 [sys.executable, "-I", str(HARNESS_PATH), harness, str(submission)],
                 cwd=directory,
                 env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"},

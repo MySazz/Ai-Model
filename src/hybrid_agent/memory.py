@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import json
+import math
+import os
 import re
 import sqlite3
+import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-import json
-import math
-import urllib.request
+from urllib.parse import urlparse
 
 from .migrations import run_migrations
+from .storage import prepare_private_parent, protect_private_file
+
+MAX_EMBEDDING_RESPONSE_BYTES = 2 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -25,20 +30,36 @@ class Memory:
     source: str
     embedding_json: str | None = None
 
+
 def _get_embedding(text: str) -> list[float]:
     try:
-        req = urllib.request.Request(
-            "http://127.0.0.1:11434/api/embeddings",
-            data=json.dumps({"model": "nomic-embed-text", "prompt": text}).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
+        base_url = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+        parsed = urlparse(base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return []
+        req = urllib.request.Request(  # noqa: S310 - URL scheme is restricted above
+            base_url + "/api/embed",
+            data=json.dumps(
+                {
+                    "model": os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
+                    "input": text,
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=2.0) as response:
-            return json.loads(response.read().decode("utf-8"))["embedding"]
-    except Exception:
+        with urllib.request.urlopen(req, timeout=2.0) as response:  # noqa: S310
+            raw = response.read(MAX_EMBEDDING_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_EMBEDDING_RESPONSE_BYTES:
+                return []
+            embeddings = json.loads(raw.decode("utf-8"))["embeddings"]
+            return embeddings[0] if embeddings else []
+    except (KeyError, IndexError, OSError, TypeError, ValueError):
         return []
 
 def _cosine_similarity(v1: list[float], v2: list[float]) -> float:
-    dot = sum(a * b for a, b in zip(v1, v2))
+    if len(v1) != len(v2):
+        return 0.0
+    dot = sum(a * b for a, b in zip(v1, v2, strict=True))
     norm1 = math.sqrt(sum(a * a for a in v1))
     norm2 = math.sqrt(sum(b * b for b in v2))
     return dot / (norm1 * norm2) if norm1 and norm2 else 0.0
@@ -48,7 +69,7 @@ class MemoryStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            prepare_private_parent(path)
         except OSError as exc:
             raise RuntimeError(f"Could not initialize MemoryStore directory: {exc}") from exc
         self._initialize()
@@ -62,7 +83,7 @@ class MemoryStore:
         def migration_0(conn: sqlite3.Connection) -> None:
             conn.execute(
                 """
-                CREATE TABLE memories (
+                CREATE TABLE IF NOT EXISTS memories (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     created_at TEXT NOT NULL,
                     user_id TEXT NOT NULL,
@@ -73,12 +94,20 @@ class MemoryStore:
                 )
                 """
             )
-            conn.execute("CREATE INDEX memories_scope ON memories(user_id, workspace_id)")
-            
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS memories_scope "
+                "ON memories(user_id, workspace_id)"
+            )
+
         def migration_1(conn: sqlite3.Connection) -> None:
-            conn.execute("ALTER TABLE memories ADD COLUMN embedding_json TEXT")
+            columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(memories)").fetchall()
+            }
+            if "embedding_json" not in columns:
+                conn.execute("ALTER TABLE memories ADD COLUMN embedding_json TEXT")
 
         run_migrations(self.path, [migration_0, migration_1])
+        protect_private_file(self.path)
 
     def add(
         self,
@@ -111,7 +140,9 @@ class MemoryStore:
                     embedding_json,
                 ),
             )
-            return int(cursor.lastrowid)
+            if cursor.lastrowid is None:
+                raise RuntimeError("SQLite did not return a memory ID.")
+            return cursor.lastrowid
 
     def search(
         self,
@@ -171,7 +202,7 @@ class MemoryStore:
                     sem_score = _cosine_similarity(query_embedding, mem_emb)
                     # Require at least 0.4 cosine similarity to be considered a semantic match
                     score = (sem_score * 10) + token_score if sem_score > 0.4 else token_score
-                except Exception:
+                except (json.JSONDecodeError, TypeError, ValueError):
                     score = token_score
             else:
                 score = token_score

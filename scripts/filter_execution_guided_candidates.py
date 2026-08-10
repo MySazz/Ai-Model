@@ -9,7 +9,6 @@ import json
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -29,12 +28,16 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--minimum-per-task", type=int, default=2)
+    parser.add_argument("--output-license", required=True)
+    parser.add_argument("--license-basis", required=True)
     args = parser.parse_args()
     tasks = load_jsonl_objects(args.tasks)
     candidates = load_jsonl_objects(args.candidates)
     accepted, report = filter_candidates(
         tasks, candidates, executable_judge=run_python_checks,
         minimum_per_task=args.minimum_per_task,
+        output_license=args.output_license,
+        license_basis=args.license_basis,
     )
     report["tasks_sha256"] = digest(args.tasks)
     report["candidates_sha256"] = digest(args.candidates)

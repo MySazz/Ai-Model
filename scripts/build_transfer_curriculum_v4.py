@@ -9,12 +9,10 @@ from pathlib import Path
 
 from build_transfer_curriculum_v3 import build_rows as build_v3_rows
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from hybrid_agent.evaluation import evaluate_responses  # noqa: E402
-
 
 TARGETED: dict[str, list[tuple[str, str]]] = {
     "unavailable_source": [

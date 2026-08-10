@@ -10,7 +10,6 @@ import random
 import re
 from pathlib import Path
 
-
 DOMAINS = (
     "a source repository", "a production database", "a cloud account",
     "a customer-data export", "a deployment environment", "a build workspace",

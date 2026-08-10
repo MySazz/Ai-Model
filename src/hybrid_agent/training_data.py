@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import tempfile
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
+
+from .privacy import PrivacyClassifier, PrivacyLevel
+
 
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -16,9 +21,6 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-from .privacy import PrivacyClassifier, PrivacyLevel
-
 
 ALLOWED_ROLES = {"system", "user", "assistant", "tool"}
 ALLOWED_LICENSES = {
@@ -35,6 +37,10 @@ ALLOWED_CATEGORIES = {
     "coding", "tool_use", "research", "vision", "infrastructure", "safety", "general"
 }
 NEAR_DUPLICATE_THRESHOLD = 0.8
+MAX_JSONL_LINE_CHARS = 2_000_000
+MAX_RECORDS = 10_000
+MAX_MESSAGES_PER_RECORD = 100
+MAX_MESSAGE_CHARS = 200_000
 EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}(?!\d)")
 
@@ -83,7 +89,26 @@ def load_jsonl(paths: Iterable[Path]) -> tuple[list[LoadedRecord], list[DatasetI
     for path in paths:
         try:
             with path.open("r", encoding="utf-8") as stream:
-                for line_number, raw_line in enumerate(stream, 1):
+                line_number = 0
+                while True:
+                    raw_line = stream.readline(MAX_JSONL_LINE_CHARS + 1)
+                    if not raw_line:
+                        break
+                    line_number += 1
+                    oversized = len(raw_line) > MAX_JSONL_LINE_CHARS
+                    while oversized and raw_line and not raw_line.endswith("\n"):
+                        raw_line = stream.readline(MAX_JSONL_LINE_CHARS + 1)
+                    if oversized:
+                        issues.append(
+                            DatasetIssue(
+                                "error",
+                                "line_too_large",
+                                f"JSONL line exceeds {MAX_JSONL_LINE_CHARS} characters.",
+                                str(path),
+                                line_number,
+                            )
+                        )
+                        continue
                     if not raw_line.strip():
                         continue
                     try:
@@ -111,6 +136,17 @@ def load_jsonl(paths: Iterable[Path]) -> tuple[list[LoadedRecord], list[DatasetI
                         )
                         continue
                     records.append(LoadedRecord(value, str(path), line_number))
+                    if len(records) > MAX_RECORDS:
+                        issues.append(
+                            DatasetIssue(
+                                "error",
+                                "record_limit",
+                                f"Dataset exceeds the {MAX_RECORDS}-record validation limit.",
+                                str(path),
+                                line_number,
+                            )
+                        )
+                        return records, issues
         except (OSError, UnicodeError) as exc:
             issues.append(
                 DatasetIssue("error", "file_read", str(exc), str(path), 0)
@@ -159,6 +195,15 @@ def validate_records(
                 record_id,
             )
             continue
+        if len(messages) > MAX_MESSAGES_PER_RECORD:
+            _issue(
+                issues,
+                item,
+                "error",
+                "message_limit",
+                f"Record exceeds {MAX_MESSAGES_PER_RECORD} messages.",
+                record_id,
+            )
         assistant_count = 0
         previous_role: str | None = None
         for index, message in enumerate(messages):
@@ -174,6 +219,19 @@ def validate_records(
                 continue
             role = message.get("role")
             content = message.get("content")
+            unknown_message_fields = sorted(
+                set(message) - {"role", "content", "tool_calls", "name", "tool_call_id"}
+            )
+            if unknown_message_fields:
+                _issue(
+                    issues,
+                    item,
+                    "error",
+                    "message_fields",
+                    f"Message {index} has unsupported fields: "
+                    + ", ".join(unknown_message_fields),
+                    record_id,
+                )
             if role not in ALLOWED_ROLES:
                 _issue(
                     issues,
@@ -197,6 +255,17 @@ def validate_records(
                     f"Message {index} requires non-empty text content.",
                     record_id,
                 )
+            elif len(content) > MAX_MESSAGE_CHARS:
+                _issue(
+                    issues,
+                    item,
+                    "error",
+                    "message_too_large",
+                    f"Message {index} exceeds {MAX_MESSAGE_CHARS} characters.",
+                    record_id,
+                )
+            if has_tool_calls:
+                _validate_tool_calls(item, issues, record_id, index, message["tool_calls"])
             if role == "assistant":
                 assistant_count += 1
             if role == "system" and index != 0:
@@ -325,18 +394,12 @@ def prepare_dataset(
     output_hashes: dict[str, str] = {}
     for split, records in splits.items():
         records.sort(key=lambda record: str(record["id"]))
-        path = output_dir / f"{split}.jsonl"
-        digest = hashlib.sha256()
-        with path.open("w", encoding="utf-8") as stream:
-            for record in records:
-                line = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-                stream.write(line)
-                digest.update(line.encode("utf-8"))
-        output_hashes[split] = digest.hexdigest()
+        output_hashes[split] = _atomic_write_jsonl(
+            output_dir / f"{split}.jsonl", records
+        )
 
     manifest = {
         "schema_version": 1,
-        "generated_at": datetime.now(UTC).isoformat(),
         "seed": seed,
         "ratios": {
             "train": train_ratio,
@@ -358,9 +421,8 @@ def prepare_dataset(
         "output_sha256": output_hashes,
         "validation": report.to_dict(),
     }
-    (output_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _atomic_write_text(
+        output_dir / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     )
     return manifest
 
@@ -448,7 +510,28 @@ def _validate_metadata(
             item,
             "error",
             "reviewed",
-            "A human must set metadata.reviewed to true.",
+            "metadata.reviewed must be true after the declared quality review completes.",
+            record_id,
+        )
+    review_method = metadata.get("review_method")
+    if metadata.get("reviewed") is True and (
+        not isinstance(review_method, str) or not review_method.strip()
+    ):
+        _issue(
+            issues,
+            item,
+            "warning",
+            "review_provenance",
+            "Reviewed records should declare metadata.review_method.",
+            record_id,
+        )
+    if "human_reviewed" in metadata and not isinstance(metadata["human_reviewed"], bool):
+        _issue(
+            issues,
+            item,
+            "error",
+            "human_reviewed",
+            "metadata.human_reviewed must be boolean when provided.",
             record_id,
         )
     if metadata.get("calibration_only") is True:
@@ -528,6 +611,16 @@ def _detect_near_duplicates(
     issues: list[DatasetIssue],
 ) -> None:
     if len(records) > 10000:
+        first = records[0][0]
+        _issue(
+            issues,
+            first,
+            "error",
+            "near_duplicate_limit",
+            "Near-duplicate validation refuses datasets above 10,000 records; shard and "
+            "deduplicate before preparation.",
+            str(first.record.get("id")) if first.record.get("id") else None,
+        )
         return
     for index, (left, left_shingles) in enumerate(records):
         if not left_shingles:
@@ -552,7 +645,7 @@ def _detect_near_duplicates(
 
 
 def _split_bucket(record_id: str, seed: str) -> float:
-    digest = hashlib.sha256(f"{seed}\0{record_id}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{seed}\0{record_id}".encode()).digest()
     return int.from_bytes(digest[:8], "big") / 2**64
 
 
@@ -570,3 +663,77 @@ def _portable_path(path: Path) -> str:
     if resolved == current or current in resolved.parents:
         return str(resolved.relative_to(current))
     return resolved.name
+
+
+def _validate_tool_calls(
+    item: LoadedRecord,
+    issues: list[DatasetIssue],
+    record_id: str | None,
+    message_index: int,
+    calls: list[Any],
+) -> None:
+    for call_index, call in enumerate(calls):
+        valid = False
+        if isinstance(call, dict) and call.get("type", "function") == "function":
+            function = call.get("function")
+            if isinstance(function, dict):
+                name = function.get("name")
+                valid = (
+                    isinstance(name, str)
+                    and bool(name)
+                    and isinstance(function.get("arguments", {}), dict)
+                )
+        if not valid:
+            _issue(
+                issues,
+                item,
+                "error",
+                "tool_call_schema",
+                f"Message {message_index} tool call {call_index} is malformed.",
+                record_id,
+            )
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _atomic_write_jsonl(path: Path, records: list[dict[str, Any]]) -> str:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    digest = hashlib.sha256()
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            for record in records:
+                line = (
+                    json.dumps(
+                        record,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+                stream.write(line)
+                digest.update(line.encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+    return digest.hexdigest()

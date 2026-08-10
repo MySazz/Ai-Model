@@ -13,7 +13,14 @@ authors = [{ name = "Jon and Johnnie" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.9"]
+dev = [
+  "mypy>=1.17,<2",
+  "pip-audit>=2.9,<3",
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1.1,<2",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<0.13",
+]
 
 [project.scripts]
 hybrid-agent = "hybrid_agent.cli:main"
@@ -24,7 +31,30 @@ packages = ["src/hybrid_agent"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+asyncio_mode = "strict"
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "BLE", "ASYNC", "S", "PERF"]
+ignore = ["E501", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["PERF401", "S310", "S311"]
+"src/hybrid_agent/agent.py" = ["BLE001"]
+"src/hybrid_agent/cli.py" = ["BLE001"]
+"src/hybrid_agent/executable_harness.py" = ["BLE001", "S108", "S110"]
+"tests/*.py" = ["S105", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/hybrid_agent"]
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "hybrid_agent.executable_harness"
+disable_error_code = ["func-returns-value", "no-any-return"]

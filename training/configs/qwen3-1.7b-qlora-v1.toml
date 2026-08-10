@@ -3,9 +3,9 @@ model_id = "Qwen/Qwen3-1.7B"
 model_revision = "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
 trust_remote_code = false
 dataset_manifest = "datasets/processed/coding-tool-v1/manifest.json"
-dataset_manifest_sha256 = "e72393c1d5b02d679340524f867e9faef50ba37db98f10334b874927026054f1"
+dataset_manifest_sha256 = "4709453782da5c70726dfc6cfae53f6e0951973c361974f7061d0f4af283bc01"
 evaluation_suite = "datasets/evaluations/flagship-v1.jsonl"
-evaluation_suite_sha256 = "6dd2c00bc1ef89613019b60d7c2415ba10e34867900913a691e4fb0c4c967fe9"
+evaluation_suite_sha256 = "d8a9967de94490780b7dbd0d6874d8059c8d7ca2fc1b25b7aac27e9660bdc6a4"
 output_dir = "training/runs/qwen3-1.7b-qlora-v1"
 seed = 1729
 

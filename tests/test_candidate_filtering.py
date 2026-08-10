@@ -34,6 +34,16 @@ def fake_executor(response, spec):
     return {name: "broken" not in response for name in spec["checks"]}
 
 
+def filter_test_candidates(tasks, candidates, **kwargs):
+    return filter_candidates(
+        tasks,
+        candidates,
+        output_license="proprietary-approved",
+        license_basis="test fixture owned by the project",
+        **kwargs,
+    )
+
+
 def test_filter_accepts_passing_diverse_candidates_and_reports_failures():
     candidates = [
         {"id": "a-code-good", "task_id": "code", "response": "def useful_alpha(): return 1", "model_id": "model-a"},
@@ -42,7 +52,7 @@ def test_filter_accepts_passing_diverse_candidates_and_reports_failures():
         {"id": "d-safe-unsafe", "task_id": "safety", "response": "TOKEN=actual-value"},
         {"id": "e-safe-duplicate", "task_id": "safety", "response": "I cannot reveal that credential."},
     ]
-    accepted, report = filter_candidates(
+    accepted, report = filter_test_candidates(
         task_bank(), candidates, executable_judge=fake_executor, minimum_per_task=1
     )
     assert [row["metadata"]["candidate_id"] for row in accepted] == ["a-code-good", "c-safe-good"]
@@ -55,7 +65,7 @@ def test_filter_accepts_passing_diverse_candidates_and_reports_failures():
 
 
 def test_calibration_candidates_can_test_pipeline_but_never_open_training_gate():
-    accepted, report = filter_candidates(
+    accepted, report = filter_test_candidates(
         [task_bank()[0]],
         [{
             "id": "calibration", "task_id": "code",
@@ -76,7 +86,7 @@ def test_filter_rejects_near_duplicates_and_repetition():
         {"id": "b", "task_id": "code", "response": "def alpha value path data safe return result changed"},
         {"id": "c", "task_id": "code", "response": "loop words repeat loop words repeat loop words repeat loop words repeat"},
     ]
-    accepted, report = filter_candidates(
+    accepted, report = filter_test_candidates(
         tasks, candidates, executable_judge=fake_executor,
         near_duplicate_threshold=0.5, minimum_per_task=1,
     )
@@ -85,7 +95,7 @@ def test_filter_rejects_near_duplicates_and_repetition():
 
 
 def test_filter_fails_dataset_gate_when_tasks_are_underfilled_or_unbalanced():
-    accepted, report = filter_candidates(
+    accepted, report = filter_test_candidates(
         task_bank(),
         [{"id": "one", "task_id": "code", "response": "def only_code(): return True"}],
         executable_judge=fake_executor, minimum_per_task=2,
@@ -98,12 +108,12 @@ def test_filter_fails_dataset_gate_when_tasks_are_underfilled_or_unbalanced():
 
 def test_filter_rejects_invalid_references_and_duplicate_ids():
     with pytest.raises(EvaluationError, match="unknown task"):
-        filter_candidates(
+        filter_test_candidates(
             task_bank(), [{"id": "x", "task_id": "missing", "response": "answer"}],
             executable_judge=fake_executor,
         )
     with pytest.raises(EvaluationError, match="Duplicate candidate ID"):
-        filter_candidates(
+        filter_test_candidates(
             task_bank(),
             [
                 {"id": "x", "task_id": "code", "response": "one"},
@@ -123,6 +133,11 @@ def test_generation_task_bank_is_training_only_and_covers_six_capabilities():
     payload = path.read_text()
     for heldout_id in ("exec-atomic-json-001", "exec-rooted-path-001", "auto-safety-001"):
         assert heldout_id not in payload
+
+
+def test_filter_requires_explicit_license_attestation():
+    with pytest.raises(EvaluationError, match="output_license"):
+        filter_candidates(task_bank(), [], executable_judge=fake_executor)
 
 
 def test_calibration_filter_output_is_rejected_by_training_data_gate():

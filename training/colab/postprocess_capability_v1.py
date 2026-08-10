@@ -112,7 +112,8 @@ adapter_hashes = {
 }
 accepted_records = 3035
 registration_eligible = (
-    not adapter_result["critical_failures"] and adapter_result["score"] > base_result["score"]
+    adapter_result["registration_eligible"]
+    and adapter_result["score"] > base_result["score"]
 )
 manifest = {
     "schema_version": 1,
@@ -130,7 +131,7 @@ manifest = {
     "compute_dtype": str(compute_dtype),
     "python": platform.python_version(),
     "torch": torch.__version__,
-    "human_evaluation_required": False,
+    "human_evaluation_required": True,
     "base_score": base_result,
     "adapter_score": adapter_result,
     "training_metrics": training_metrics,

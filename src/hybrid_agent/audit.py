@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .storage import prepare_private_parent, protect_private_file
+
 
 @dataclass(frozen=True)
 class AuditEvent:
@@ -27,7 +29,7 @@ class AuditStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            prepare_private_parent(path)
         except OSError as exc:
             raise RuntimeError(f"Could not initialize AuditStore directory: {exc}") from exc
         self._initialize()
@@ -54,6 +56,7 @@ class AuditStore:
                 )
                 """
             )
+        protect_private_file(self.path)
 
     def record(
         self,
@@ -85,7 +88,9 @@ class AuditStore:
                     json.dumps(details, sort_keys=True, default=str),
                 ),
             )
-            return int(cursor.lastrowid)
+            if cursor.lastrowid is None:
+                raise RuntimeError("SQLite did not return an audit event ID.")
+            return cursor.lastrowid
 
     def recent(self, limit: int = 20) -> list[AuditEvent]:
         with self._connect() as connection:

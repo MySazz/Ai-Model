@@ -24,6 +24,16 @@ _LOCAL_ONLY_PATTERNS = (
     ("private key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
     ("cloud access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
+    ("OpenAI-style API key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b")),
+    ("GitLab token", re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b")),
+    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    ("Stripe secret key", re.compile(r"\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b")),
+    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("JSON Web Token", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")),
+    ("bearer token", re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}")),
+    ("AWS secret key", re.compile(
+        r"(?i)\baws[_-]?secret(?:[_-]?access)?[_-]?key\s*[:=]\s*[\"']?[A-Za-z0-9/+=]{32,}"
+    )),
     ("generic secret assignment", re.compile(
         r"(?i)\b(?:api[_-]?key|secret|password|token)\s*[:=]\s*[\"']?[^\s\"']{8,}"
     )),

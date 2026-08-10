@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 from hybrid_agent.memory import MemoryStore
@@ -30,3 +31,31 @@ def test_relevant_memory_uses_token_overlap(tmp_path: Path) -> None:
     assert [memory.content for memory in results] == [
         "The project uses a CLI-first development workflow"
     ]
+
+
+def test_legacy_database_is_migrated_without_recreating_table(tmp_path: Path) -> None:
+    path = tmp_path / "legacy.db"
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                workspace_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL
+            )
+            """
+        )
+    store = MemoryStore(path)
+    memory_id = store.add("Migrated successfully")
+    assert memory_id == 1
+    with sqlite3.connect(path) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(memories)")}
+        versions = connection.execute(
+            "SELECT version FROM schema_migrations ORDER BY version"
+        ).fetchall()
+    assert "embedding_json" in columns
+    assert versions == [(0,), (1,)]

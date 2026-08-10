@@ -19,7 +19,10 @@ Reference cloud environment:
 1. Use an ephemeral Linux instance with Python 3.11 and one NVIDIA GPU (16 GiB
    VRAM minimum, 24 GiB preferred).
 2. Install a PyTorch build matching the instance CUDA driver.
-3. Install `training/requirements-qlora-v1.txt` without changing versions.
+3. Install `training/requirements-qlora-v1.txt` without changing versions. Its
+   Transformers pin was raised to the first version clearing every advisory
+   known during the 2026-08-10 audit; run the dependency audit and a setup-only
+   compatibility check again before paying for a GPU run.
 4. Verify the pinned model revision and dataset/evaluation hashes.
 5. Run the base evaluation before training, then train, then run the identical
    evaluation against the adapter.
@@ -63,8 +66,9 @@ PYTHONPATH=src python3 scripts/build_capability_corpus.py --download
 This is the first candidate-scale specialization dataset, not a claim that every
 general capability is covered. Its dominant signals are coding, tool selection,
 structured calls, tool-result grounding, and DevOps knowledge. Registration
-still requires an automated improvement over the pinned base model with no
-critical safety failures.
+still requires an automated improvement over the pinned base model, no critical
+safety failures, 80% overall, 70% in each represented capability, and human
+review.
 
 ## Google Colab
 
@@ -92,7 +96,8 @@ errors or warnings.
 The v2 QLoRA is deliberately less aggressive: rank 8, attention projection
 targets only, and a 2e-5 learning rate. Run it with
 `training/colab/run_capability_v2.py`; registration still requires a strict
-automated improvement over the base model and zero critical failures.
+automated improvement over the base model, zero critical failures, the global
+capability thresholds, and human review.
 
 ## Validate source data
 

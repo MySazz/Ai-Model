@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
+import shlex
+import shutil
 import sys
-import asyncio
 from pathlib import Path
 
 from . import __version__
 from .agent import AgentSession
 from .audit import AuditStore
-from .experiments import ExperimentError, verify_experiment, write_blocked_baseline
 from .evaluation import EvaluationError, evaluate_responses, load_jsonl_objects
+from .experiments import ExperimentError, verify_experiment, write_blocked_baseline
 from .memory import MemoryStore
+from .models import ModelProvider
 from .permissions import PermissionPolicy
 from .privacy import PrivacyLevel
 from .providers import OfflineProvider, OllamaProvider
@@ -56,13 +59,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--sandbox",
         choices=("none", "docker"),
         default="none",
-        help="Containerize tool execution for safety (default: none)"
+        help="Run allowlisted commands in the prebuilt hardened sandbox image",
     )
     chat.add_argument(
         "--mcp-server",
         action="append",
         default=[],
-        help="Command to run an MCP server (e.g. 'npx -y @modelcontextprotocol/server-github'); repeat for multiple servers"
+        help="Command for an audited, locally installed MCP server; repeat for multiple servers",
+    )
+    chat.add_argument(
+        "--mcp-pass-env",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Explicitly pass one named environment variable to MCP servers; repeat as needed",
     )
     chat.add_argument(
         "--image",
@@ -152,7 +162,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def make_provider(name: str, model: str, ollama_url: str):
+def make_provider(name: str, model: str, ollama_url: str) -> ModelProvider:
     if name == "offline":
         return OfflineProvider()
     if not model:
@@ -212,7 +222,6 @@ def run_chat(args: argparse.Namespace) -> int:
         return 2
 
     from .mcp_client import MCPClient
-    import shlex
 
     research = ResearchStore(args.state_dir / "research.db")
     tools_registry = default_registry(
@@ -226,14 +235,17 @@ def run_chat(args: argparse.Namespace) -> int:
     mcp_clients: list[MCPClient] = []
     for cmd_str in args.mcp_server:
         cmd = shlex.split(cmd_str)
+        client: MCPClient | None = None
         try:
-            client = MCPClient(cmd)
+            client = MCPClient(cmd, pass_environment=args.mcp_pass_env)
             for tool in client.list_tools():
                 tools_registry.register(tool)
             mcp_clients.append(client)
             print(f"Loaded MCP server: {cmd[0]}")
         except Exception as exc:
             print(f"Failed to start MCP server {cmd_str}: {exc}", file=sys.stderr)
+            if client is not None:
+                client.close()
             for c in mcp_clients:
                 c.close()
             return 2
@@ -253,12 +265,14 @@ def run_chat(args: argparse.Namespace) -> int:
         images = tuple(load_image(path, workspace=workspace) for path in args.image)
     except (OSError, ValueError, PermissionError) as exc:
         print(f"Image error: {exc}", file=sys.stderr)
+        for client in mcp_clients:
+            client.close()
         return 2
     try:
         if args.prompt:
             try:
                 print(asyncio.run(session.run(args.prompt, images=images)))
-            except (RuntimeError, KeyError, PermissionError) as exc:
+            except (RuntimeError, KeyError, PermissionError, ValueError) as exc:
                 print(f"Agent error: {exc}", file=sys.stderr)
                 return 1
             return 0
@@ -276,7 +290,7 @@ def run_chat(args: argparse.Namespace) -> int:
                 continue
             try:
                 print(f"agent> {asyncio.run(session.run(prompt, images=images))}")
-            except (RuntimeError, KeyError, PermissionError) as exc:
+            except (RuntimeError, KeyError, PermissionError, ValueError) as exc:
                 print(f"Agent error: {exc}", file=sys.stderr)
     finally:
         for client in mcp_clients:
@@ -309,9 +323,14 @@ def run_doctor(args: argparse.Namespace) -> int:
     state_dir = args.state_dir.resolve()
     AuditStore(state_dir / "agent.db")
     checks = [
-        ("Python", sys.version.split()[0], True),
+        ("Python", sys.version.split()[0], sys.version_info >= (3, 12)),
         ("State directory", str(state_dir), os.access(state_dir, os.W_OK)),
-        ("OLLAMA_MODEL", os.environ.get("OLLAMA_MODEL", "not configured"), True),
+        ("OLLAMA_MODEL", os.environ.get("OLLAMA_MODEL", "not configured (optional)"), True),
+        (
+            "Docker",
+            "available" if shutil.which("docker") else "not installed (optional)",
+            True,
+        ),
     ]
     for name, value, healthy in checks:
         print(f"{'ok' if healthy else 'error':5} {name}: {value}")

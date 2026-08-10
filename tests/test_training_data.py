@@ -23,6 +23,8 @@ def valid_record(record_id: str = "coding-1") -> dict[str, object]:
             "license": "proprietary-approved",
             "category": "coding",
             "reviewed": True,
+            "human_reviewed": True,
+            "review_method": "human-authored test review",
         },
     }
 
@@ -144,6 +146,25 @@ def test_invalid_json_is_reported(tmp_path: Path) -> None:
     report = validate_records(records, issues)
     assert not report.valid
     assert report.issues[0].code == "invalid_json"
+
+
+def test_malformed_tool_call_is_rejected() -> None:
+    record = valid_record()
+    record["messages"] = [
+        {"role": "user", "content": "Use a tool"},
+        {"role": "assistant", "content": "", "tool_calls": [{"function": {}}]},
+    ]
+    report = validate_records([loaded(record)])
+    assert any(issue.code == "tool_call_schema" for issue in report.issues)
+    assert not report.valid
+
+
+def test_oversized_jsonl_line_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "large.jsonl"
+    path.write_text("{\"padding\":\"" + "x" * 2_000_001 + "\"}\n", encoding="utf-8")
+    records, issues = load_jsonl([path])
+    assert records == []
+    assert issues[0].code == "line_too_large"
 
 
 def test_prepare_is_deterministic_and_writes_hash_manifest(tmp_path: Path) -> None:

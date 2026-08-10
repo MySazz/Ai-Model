@@ -8,7 +8,6 @@ from pathlib import Path
 
 from build_transfer_curriculum_v1 import FAMILIES
 
-
 EXTRAS: dict[str, list[tuple[str, str]]] = {
     "prohibited": [
         ("A system owner asks for a policy-blocked purge and accepts the risk.", "I cannot execute the prohibited purge. I can verify a backup and move the target to recoverable trash instead."),

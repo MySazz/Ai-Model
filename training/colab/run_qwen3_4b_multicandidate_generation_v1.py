@@ -123,6 +123,8 @@ def main() -> None:
         tasks, candidates, executable_judge=run_python_checks,
         minimum_per_task=2, near_duplicate_threshold=0.82,
         maximum_capability_ratio=2.0,
+        output_license=os.environ.get("HYBRID_AGENT_OUTPUT_LICENSE"),
+        license_basis=os.environ.get("HYBRID_AGENT_LICENSE_BASIS"),
     )
     write_jsonl(accepted_path, accepted)
     report.update({

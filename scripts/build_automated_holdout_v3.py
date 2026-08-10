@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "datasets/evaluations/automated-development-v2.jsonl"
 OUTPUT = ROOT / "datasets/evaluations/automated-holdout-v3.jsonl"

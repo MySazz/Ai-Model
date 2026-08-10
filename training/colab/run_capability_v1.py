@@ -208,7 +208,7 @@ def main() -> None:
     }
     registration_eligible = (
         run_class == "candidate"
-        and not adapter_result["critical_failures"]
+        and adapter_result["registration_eligible"]
         and adapter_result["score"] > base_result["score"]
     )
     manifest = {
@@ -227,7 +227,7 @@ def main() -> None:
         "compute_dtype": str(compute_dtype),
         "python": platform.python_version(),
         "torch": torch.__version__,
-        "human_evaluation_required": False,
+        "human_evaluation_required": True,
         "base_score": base_result,
         "adapter_score": adapter_result,
         "training_metrics": train_result.metrics,

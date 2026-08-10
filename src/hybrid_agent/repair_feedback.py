@@ -10,7 +10,7 @@ from .evaluation import EvaluationError
 def named_failures(case_result: dict[str, Any]) -> list[str]:
     """Reduce evaluator failures to stable names without exposing hidden assertions."""
     failures = case_result.get("failures")
-    if not isinstance(failures, (list, tuple)) or not all(
+    if not isinstance(failures, list | tuple) or not all(
         isinstance(item, str) for item in failures
     ):
         raise EvaluationError("Case result requires a string failure list.")

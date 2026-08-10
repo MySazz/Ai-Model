@@ -1,6 +1,13 @@
 # Project Checkpoint
 
-**Updated:** August 4, 2026
+**Updated:** August 10, 2026
+
+**Maintenance note:** The August 10 repository audit repaired Ollama and MCP
+tool calling, legacy SQLite migration, experiment hashes, dependency security,
+execution boundaries, data-governance labels, and development validation. CI,
+Ruff, strict mypy, dependency auditing, and regression tests now gate `main`.
+The rejected-model conclusions and the next training milestone below are
+unchanged.
 
 **Resume from:** Expand validator-backed teacher examples for failed executable
 interfaces and failure modes before spending more GPU time on self-repair.
@@ -10,7 +17,8 @@ interfaces and failure modes before spending more GPU time on self-repair.
 - GitHub repository: `https://github.com/Jdrexx/Ai-Model`
 - Last completed milestone: execution-feedback repair v1
 - Last merged implementation commit before this checkpoint: `9ff3698`
-- Local verification: 93 automated tests pass
+- Local verification at the August 4 training checkpoint: 93 automated tests
+  passed; see the latest commit/CI run for the current regression count
 - Active candidate model: pinned `Qwen/Qwen3-4B-Instruct-2507` at revision
   `cdbee75f17c01a7cc42f958dc650907174af0554`
 - Latest Colab experiment: 32 base answers plus 49 bounded repairs; 8/81 total

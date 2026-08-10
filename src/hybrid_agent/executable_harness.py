@@ -7,8 +7,89 @@ import json
 import os
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+_WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+
+
+def _inside(path: Path, roots: tuple[Path, ...]) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    return any(resolved == root or root in resolved.parents for root in roots)
+
+
+def install_safety_audit_hook(submission_path: Path) -> None:
+    """Deny network/process access and confine file writes during authored checks.
+
+    This is defense in depth for accidental or ordinary Python behavior. The parent
+    process still requires a disposable VM or container as the hostile-code boundary.
+    """
+    evaluation_root = submission_path.parent.resolve()
+    scratch = evaluation_root / "scratch"
+    scratch.mkdir(mode=0o700)
+    tempfile.tempdir = str(scratch)
+    read_roots = tuple(
+        dict.fromkeys(
+            path.resolve()
+            for path in (
+                evaluation_root,
+                Path(__file__).parent,
+                Path(sys.base_prefix),
+                Path(sys.prefix),
+            )
+        )
+    )
+    write_roots = (evaluation_root,)
+    blocked_events = {
+        "ctypes.dlopen",
+        "os.exec",
+        "os.posix_spawn",
+        "os.spawn",
+        "os.system",
+        "socket.__new__",
+        "socket.bind",
+        "socket.connect",
+        "socket.getaddrinfo",
+        "subprocess.Popen",
+    }
+
+    def audit(event: str, args: tuple[Any, ...]) -> None:
+        if event in blocked_events or event.startswith("socket."):
+            raise PermissionError(f"Executable evaluation blocked operation: {event}")
+        if event == "open" and args and isinstance(args[0], str | bytes | os.PathLike):
+            path = Path(os.fsdecode(args[0]))
+            mode = args[1] if len(args) > 1 else "r"
+            flags = args[2] if len(args) > 2 else 0
+            writing = (
+                isinstance(mode, str) and any(character in mode for character in "wax+")
+            ) or (isinstance(flags, int) and bool(flags & _WRITE_FLAGS))
+            allowed = _inside(path, write_roots if writing else read_roots)
+            if not allowed:
+                raise PermissionError(f"Executable evaluation blocked file access: {path}")
+        if event in {
+            "os.chdir",
+            "os.chmod",
+            "os.chown",
+            "os.link",
+            "os.mkdir",
+            "os.remove",
+            "os.rename",
+            "os.rmdir",
+            "os.symlink",
+            "os.truncate",
+            "os.utime",
+        }:
+            paths = [
+                arg for arg in args[:2] if isinstance(arg, str | bytes | os.PathLike)
+            ]
+            if any(not _inside(Path(os.fsdecode(path)), write_roots) for path in paths):
+                raise PermissionError(f"Executable evaluation blocked operation: {event}")
+
+    sys.addaudithook(audit)
 
 
 def load(path: str) -> Any:
@@ -308,7 +389,9 @@ HARNESSES = {
 def main() -> None:
     if len(sys.argv) != 3 or sys.argv[1] not in HARNESSES:
         raise SystemExit(2)
-    module = load(sys.argv[2])
+    submission = Path(sys.argv[2]).resolve()
+    install_safety_audit_hook(submission)
+    module = load(str(submission))
     outcomes = HARNESSES[sys.argv[1]](module)
     sys.stdout.write(json.dumps(outcomes, sort_keys=True))
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .evaluation import EvaluationError, evaluate_responses
-
 
 ExecutableJudge = Callable[[str, dict[str, Any]], dict[str, bool]]
 
@@ -27,12 +27,6 @@ def _shingles(text: str, size: int = 5) -> set[tuple[str, ...]]:
     return {tuple(tokens[index:index + size]) for index in range(len(tokens) - size + 1)}
 
 
-def _similarity(left: str, right: str) -> float:
-    left_set, right_set = _shingles(left), _shingles(right)
-    union = left_set | right_set
-    return len(left_set & right_set) / len(union) if union else 1.0
-
-
 def _repeats_excessively(text: str, maximum: int = 3) -> bool:
     tokens = _tokens(text)
     counts = Counter(tuple(tokens[index:index + 3]) for index in range(len(tokens) - 2))
@@ -48,12 +42,27 @@ def filter_candidates(
     minimum_per_task: int = 2,
     required_capabilities: set[str] | None = None,
     maximum_capability_ratio: float = 2.0,
+    output_license: str | None = None,
+    license_basis: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Validate, behaviorally score, deduplicate, and gate generated candidates."""
     if not 0 <= near_duplicate_threshold <= 1:
         raise EvaluationError("near_duplicate_threshold must be between zero and one.")
     if minimum_per_task <= 0:
         raise EvaluationError("minimum_per_task must be positive.")
+    if output_license not in {
+        "Apache-2.0",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "CC-BY-4.0",
+        "CC-BY-SA-4.0",
+        "MIT",
+        "proprietary-approved",
+        "public-domain",
+    }:
+        raise EvaluationError("An explicit approved output_license is required.")
+    if not isinstance(license_basis, str) or not license_basis.strip():
+        raise EvaluationError("A non-empty license_basis is required.")
     indexed_tasks: dict[str, dict[str, Any]] = {}
     for task in tasks:
         task_id = task.get("id")
@@ -69,7 +78,6 @@ def filter_candidates(
 
     seen_candidate_ids: set[str] = set()
     accepted: list[dict[str, Any]] = []
-    accepted_texts: list[str] = []
     accepted_fingerprints: set[str] = set()
     accepted_shingles_list: list[set[tuple[str, ...]]] = []
     decisions: list[dict[str, Any]] = []
@@ -85,23 +93,31 @@ def filter_candidates(
         candidate_id = candidate.get("id")
         task_id = candidate.get("task_id")
         response = candidate.get("response")
-        if not all(isinstance(value, str) and value for value in (candidate_id, task_id, response)):
+        if (
+            not isinstance(candidate_id, str)
+            or not candidate_id
+            or not isinstance(task_id, str)
+            or not task_id
+            or not isinstance(response, str)
+            or not response
+        ):
             raise EvaluationError("Every candidate requires non-empty id, task_id, and response strings.")
         if candidate_id in seen_candidate_ids:
             raise EvaluationError(f"Duplicate candidate ID: {candidate_id}")
         seen_candidate_ids.add(candidate_id)
-        task = indexed_tasks.get(task_id)
-        if task is None:
+        current_task = indexed_tasks.get(task_id)
+        if current_task is None:
             raise EvaluationError(f"Candidate {candidate_id} references unknown task {task_id}.")
-        capability = task["capability"]
+        capability = str(current_task["capability"])
+        family = str(current_task["family"])
         input_by_capability[capability] += 1
-        evaluator_type = task["evaluator"].get("type")
+        evaluator_type = current_task["evaluator"].get("type")
         kwargs: dict[str, Any] = {}
         if evaluator_type == "executable_assertions":
             if executable_judge is None:
                 raise EvaluationError(f"Task {task_id} requires an executable judge.")
             kwargs["executable_judge"] = executable_judge
-        evaluation_task = dict(task)
+        evaluation_task = dict(current_task)
         if evaluator_type == "executable_assertions":
             evaluation_task["critical_failure"] = True
         result = evaluate_responses(
@@ -137,17 +153,19 @@ def filter_candidates(
         output = {
             "id": f"filtered-{candidate_id}",
             "messages": [
-                {"role": "user", "content": task["prompt"]},
+                {"role": "user", "content": current_task["prompt"]},
                 {"role": "assistant", "content": response},
             ],
             "metadata": {
                 "source": "Hybrid Agent execution-guided candidate filtering",
-                "license": "proprietary-approved",
+                "license": output_license,
+                "license_basis": license_basis,
                 "category": capability,
                 "reviewed": True,
+                "human_reviewed": False,
                 "review_method": "behavioral validation plus diversity filtering",
-                "behavior_concept": task["family"],
-                "split_group": task["family"],
+                "behavior_concept": family,
+                "split_group": family,
                 "task_id": task_id,
                 "candidate_id": candidate_id,
                 "generator": candidate.get("model_id", "unknown"),
@@ -156,13 +174,12 @@ def filter_candidates(
             },
         }
         accepted.append(output)
-        accepted_texts.append(response)
         accepted_fingerprints.add(fingerprint)
         accepted_shingles_list.append(shingles)
         if candidate.get("calibration_only") is True:
             calibration_candidates_accepted += 1
         accepted_by_capability[capability] += 1
-        accepted_by_family[task["family"]] += 1
+        accepted_by_family[family] += 1
         accepted_by_task[task_id] += 1
         decisions.append({
             "id": candidate_id, "task_id": task_id, "accepted": True,

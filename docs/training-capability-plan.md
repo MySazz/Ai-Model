@@ -124,5 +124,3 @@ verify mechanics but must be labeled `pipeline-only` rather than `candidate`.
    records. Stop expanding when held-out gains flatten or regress.
 6. Compare every adapter with the pinned base model using identical decoding,
    evaluator versions, and hardware-independent pass criteria.
-
-2

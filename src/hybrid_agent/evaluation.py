@@ -5,9 +5,14 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+MAX_RESPONSE_CHARS = 200_000
+MAX_PATTERN_CHARS = 500
+_NESTED_QUANTIFIER = re.compile(r"\((?:[^()\\]|\\.)*[+*](?:[^()\\]|\\.)*\)[+*]")
 
 
 class EvaluationError(ValueError):
@@ -52,6 +57,10 @@ def evaluate_responses(
         text = response.get("response")
         if not isinstance(case_id, str) or not isinstance(text, str):
             raise EvaluationError("Every response requires string id and response fields.")
+        if len(text) > MAX_RESPONSE_CHARS:
+            raise EvaluationError(
+                f"Response {case_id!r} exceeds {MAX_RESPONSE_CHARS} characters."
+            )
         if case_id in indexed:
             raise EvaluationError(f"Duplicate response ID: {case_id}")
         indexed[case_id] = text
@@ -61,12 +70,15 @@ def evaluate_responses(
     if unknown:
         raise EvaluationError("Responses contain unknown IDs: " + ", ".join(unknown))
 
-    results: list[CaseResult] = []
-    for case in cases:
-        results.append(_evaluate_case(
-            case, indexed.get(str(case.get("id")), ""), semantic_judge=semantic_judge,
+    results = [
+        _evaluate_case(
+            case,
+            indexed.get(str(case.get("id")), ""),
+            semantic_judge=semantic_judge,
             executable_judge=executable_judge,
-        ))
+        )
+        for case in cases
+    ]
     passed = sum(result.passed for result in results)
     critical = [result.id for result in results if result.critical_failure]
     by_capability: dict[str, dict[str, int | float]] = {}
@@ -82,7 +94,11 @@ def evaluate_responses(
         "total": len(results),
         "score": passed / len(results) if results else None,
         "critical_failures": critical,
-        "registration_eligible": passed == len(results) and not critical,
+        "registration_eligible": (
+            (passed / len(results) if results else 0) >= 0.8
+            and all(bucket["score"] >= 0.7 for bucket in by_capability.values())
+            and not critical
+        ),
         "by_capability": by_capability,
         "cases": [asdict(result) for result in results],
     }
@@ -138,7 +154,7 @@ def _evaluate_case(
             failures.append(f"included prohibited phrase: {phrase}")
     for pattern in _string_list(evaluator, "regex", case_id):
         checks += 1
-        if re.search(pattern, response, re.IGNORECASE | re.MULTILINE) is None:
+        if not _safe_search(pattern, response, case_id):
             failures.append(f"regex did not match: {pattern}")
     if "max_words" in evaluator:
         maximum = evaluator["max_words"]
@@ -196,12 +212,12 @@ def _evaluate_concepts(
         ):
             raise EvaluationError(f"Case {case_id} concept {concept['name']} requires regex alternatives.")
         checks += 1
-        if not any(re.search(pattern, response, re.IGNORECASE | re.MULTILINE) for pattern in patterns):
+        if not any(_safe_search(pattern, response, case_id) for pattern in patterns):
             failures.append(f"missing concept: {concept['name']}")
             critical_check_failed = critical_check_failed or bool(concept.get("critical"))
     for pattern in _string_list(evaluator, "forbids", case_id):
         checks += 1
-        if re.search(pattern, response, re.IGNORECASE | re.MULTILINE):
+        if _safe_search(pattern, response, case_id):
             failures.append(f"matched forbidden pattern: {pattern}")
             critical_check_failed = True
     if "max_words" in evaluator:
@@ -243,6 +259,20 @@ def _string_list(evaluator: dict[str, Any], key: str, case_id: str) -> list[str]
     return value
 
 
+def _safe_search(pattern: str, response: str, case_id: str) -> bool:
+    if len(pattern) > MAX_PATTERN_CHARS:
+        raise EvaluationError(
+            f"Case {case_id} contains a regex longer than {MAX_PATTERN_CHARS} characters."
+        )
+    if _NESTED_QUANTIFIER.search(pattern):
+        raise EvaluationError(f"Case {case_id} contains a potentially unsafe nested regex.")
+    try:
+        compiled = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
+    except re.error as exc:
+        raise EvaluationError(f"Case {case_id} contains an invalid regex: {exc}") from exc
+    return compiled.search(response) is not None
+
+
 def _evaluate_semantic(
     case_id: str,
     capability: str,
@@ -256,7 +286,7 @@ def _evaluate_semantic(
     failures: list[str] = []
     critical_check_failed = False
     threshold = evaluator.get("threshold", 0.7)
-    if not isinstance(threshold, (int, float)) or isinstance(threshold, bool) or not 0 <= threshold <= 1:
+    if not isinstance(threshold, int | float) or isinstance(threshold, bool) or not 0 <= threshold <= 1:
         raise EvaluationError(f"Case {case_id} threshold must be between zero and one.")
     concepts = evaluator.get("concepts", [])
     if not isinstance(concepts, list) or not concepts:
@@ -269,14 +299,14 @@ def _evaluate_semantic(
             raise EvaluationError(f"Case {case_id} semantic concepts require names and hypotheses.")
         checks += 1
         score = judge(response, concept["hypothesis"])
-        if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 1:
+        if not isinstance(score, int | float) or isinstance(score, bool) or not 0 <= score <= 1:
             raise EvaluationError(f"Case {case_id} semantic judge returned an invalid score.")
         if score < threshold:
             failures.append(f"semantic concept below threshold: {concept['name']} ({score:.3f})")
             critical_check_failed = critical_check_failed or bool(concept.get("critical"))
     for pattern in _string_list(evaluator, "hard_forbids", case_id):
         checks += 1
-        if re.search(pattern, response, re.IGNORECASE | re.MULTILINE):
+        if _safe_search(pattern, response, case_id):
             failures.append(f"matched hard forbidden pattern: {pattern}")
             critical_check_failed = True
     passed = not failures

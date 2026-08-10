@@ -3,7 +3,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts" / "build_transfer_curriculum_v4.py"
 
 

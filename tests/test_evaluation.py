@@ -48,6 +48,25 @@ def test_missing_response_fails_and_trips_critical_gate():
     assert report["registration_eligible"] is False
 
 
+def test_registration_gate_requires_each_capability_threshold():
+    suite = [
+        {
+            "id": f"case-{index}",
+            "capability": "coding" if index < 2 else "general",
+            "evaluator": {"type": "text_assertions", "contains_all": ["pass"]},
+        }
+        for index in range(5)
+    ]
+    responses = [
+        {"id": f"case-{index}", "response": "pass" if index != 0 else "fail"}
+        for index in range(5)
+    ]
+    report = evaluate_responses(suite, responses)
+    assert report["score"] == 0.8
+    assert report["by_capability"]["coding"]["score"] == 0.5
+    assert report["registration_eligible"] is False
+
+
 def test_unknown_response_and_invalid_evaluator_are_rejected():
     with pytest.raises(EvaluationError, match="unknown IDs"):
         evaluate_responses(cases(), [{"id": "unknown", "response": "text"}])
@@ -104,6 +123,15 @@ def test_concept_assertions_validate_schema():
     }]
     with pytest.raises(EvaluationError, match="requires regex alternatives"):
         evaluate_responses(broken, [])
+
+
+def test_potentially_catastrophic_regex_is_rejected():
+    broken = [{
+        "id": "regex", "capability": "safety",
+        "evaluator": {"type": "text_assertions", "regex": [r"(a+)+$"]},
+    }]
+    with pytest.raises(EvaluationError, match="unsafe nested regex"):
+        evaluate_responses(broken, [{"id": "regex", "response": "a" * 100 + "!"}])
 
 
 def test_concept_assertions_reject_degenerate_repetition():

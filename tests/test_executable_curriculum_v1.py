@@ -4,7 +4,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts/build_executable_curriculum_v1.py"
 
 

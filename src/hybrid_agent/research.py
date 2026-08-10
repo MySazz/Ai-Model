@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+from .storage import prepare_private_parent, protect_private_file
+
+MAX_SOURCE_BYTES = 2 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -36,7 +41,7 @@ class ResearchStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            prepare_private_parent(path)
         except OSError as exc:
             raise RuntimeError(f"Could not initialize ResearchStore directory: {exc}") from exc
         self._initialize()
@@ -64,6 +69,7 @@ class ResearchStore:
                 )
                 """
             )
+        protect_private_file(self.path)
 
     def add_text(
         self,
@@ -78,6 +84,8 @@ class ResearchStore:
         clean_title = title.strip()
         if not clean_title or not content:
             raise ValueError("Research sources require a title and non-empty content.")
+        if len(content.encode("utf-8")) > MAX_SOURCE_BYTES:
+            raise ValueError(f"Research source exceeds the {MAX_SOURCE_BYTES}-byte limit.")
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         with self._connect() as connection:
             existing = connection.execute(
@@ -107,7 +115,9 @@ class ResearchStore:
                     content,
                 ),
             )
-            return int(cursor.lastrowid)
+            if cursor.lastrowid is None:
+                raise RuntimeError("SQLite did not return a research source ID.")
+            return cursor.lastrowid
 
     def add_workspace_file(
         self,
@@ -122,10 +132,14 @@ class ResearchStore:
         resolved = path.resolve()
         if resolved != root and root not in resolved.parents:
             raise PermissionError("Research source escapes the configured workspace.")
+        if resolved.stat().st_size > MAX_SOURCE_BYTES:
+            raise ValueError(f"Research source exceeds the {MAX_SOURCE_BYTES}-byte limit.")
         try:
             content = resolved.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            raise ValueError(f"File '{resolved.name}' is binary or not valid UTF-8.")
+            raise ValueError(
+                f"File '{resolved.name}' is binary or not valid UTF-8."
+            ) from None
         return self.add_text(
             title=title or resolved.name,
             uri=str(resolved.relative_to(root)),
@@ -140,7 +154,7 @@ class ResearchStore:
         user_id: str = "local",
         workspace_id: str = "default",
         limit: int = 50,
-    ) -> list[ResearchSource]:
+    ) -> builtins.list[ResearchSource]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -159,16 +173,25 @@ class ResearchStore:
         user_id: str = "local",
         workspace_id: str = "default",
         limit: int = 20,
-    ) -> list[SourceMatch]:
+    ) -> builtins.list[SourceMatch]:
         needle = query.strip().lower()
         if not needle:
             raise ValueError("Research query cannot be empty.")
+        bounded_limit = min(max(1, limit), 100)
+        escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM research_sources
+                WHERE user_id = ? AND workspace_id = ?
+                  AND lower(content) LIKE ? ESCAPE '\\'
+                ORDER BY id DESC LIMIT 50
+                """,
+                (user_id, workspace_id, f"%{escaped}%"),
+            ).fetchall()
         matches: list[SourceMatch] = []
-        for source in self.list(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            limit=500,
-        ):
+        for row in rows:
+            source = ResearchSource(**dict(row))
             for line_number, line in enumerate(source.content.splitlines(), 1):
                 if needle in line.lower():
                     matches.append(
@@ -181,6 +204,6 @@ class ResearchStore:
                             excerpt=line[:500],
                         )
                     )
-                    if len(matches) >= limit:
+                    if len(matches) >= bounded_limit:
                         return matches
         return matches

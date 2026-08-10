@@ -15,17 +15,20 @@ class ImageInput:
 
 
 @dataclass(frozen=True)
-class Message:
-    role: str
-    content: str
-    images: tuple[ImageInput, ...] = field(default_factory=tuple)
-
-
-@dataclass(frozen=True)
 class ToolCall:
     id: str
     name: str
     arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class Message:
+    role: str
+    content: str
+    images: tuple[ImageInput, ...] = field(default_factory=tuple)
+    tool_calls: tuple[ToolCall, ...] = field(default_factory=tuple)
+    tool_name: str | None = None
+    tool_call_id: str | None = None
 
 
 @dataclass(frozen=True)

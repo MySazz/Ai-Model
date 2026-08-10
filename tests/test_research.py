@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from hybrid_agent.research import ResearchStore
+from hybrid_agent.research import MAX_SOURCE_BYTES, ResearchStore
 
 
 def test_source_search_has_line_provenance(tmp_path: Path) -> None:
@@ -33,3 +33,16 @@ def test_source_path_is_workspace_scoped(tmp_path: Path) -> None:
     store = ResearchStore(tmp_path / "research.db")
     with pytest.raises(PermissionError):
         store.add_workspace_file(outside, workspace=workspace)
+
+
+def test_oversized_source_is_rejected(tmp_path: Path) -> None:
+    store = ResearchStore(tmp_path / "research.db")
+    with pytest.raises(ValueError, match="exceeds"):
+        store.add_text(title="Too large", uri="large", content="x" * (MAX_SOURCE_BYTES + 1))
+
+
+def test_research_database_is_private(tmp_path: Path) -> None:
+    path = tmp_path / "state" / "research.db"
+    ResearchStore(path)
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert path.parent.stat().st_mode & 0o777 == 0o700

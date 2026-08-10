@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 SUBJECTS = ("workspace", "repository", "service", "database", "release", "project",
             "artifact", "cluster", "package", "configuration", "job", "environment")
 

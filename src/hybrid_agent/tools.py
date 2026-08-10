@@ -4,23 +4,33 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import heapq
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
-import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .permissions import RiskLevel
 from .research import ResearchStore
 
-
 ToolHandler = Callable[[dict[str, Any]], str]
 RiskAssessor = Callable[[dict[str, Any]], RiskLevel]
 Previewer = Callable[[dict[str, Any]], str]
+
+MAX_FILE_CHARS = 100_000
+MAX_EDIT_CHARS = 1_000_000
+MAX_LIST_ENTRIES = 1_000
+MAX_SEARCH_FILE_BYTES = 2 * 1024 * 1024
+MAX_TOOL_ARGUMENT_CHARS = 100_000
+MAX_PATCH_PREVIEW_CHARS = 100_000
+SANDBOX_IMAGE = "hybrid-agent-sandbox:0.1.0"
 
 
 @dataclass(frozen=True)
@@ -38,12 +48,53 @@ class Tool:
     def preview(self, arguments: dict[str, Any]) -> str | None:
         return self.previewer(arguments) if self.previewer else None
 
+    def validate_arguments(self, arguments: dict[str, Any]) -> None:
+        if not isinstance(arguments, dict):
+            raise ValueError("Tool arguments must be an object.")
+        try:
+            serialized = json.dumps(arguments, ensure_ascii=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Tool arguments must be JSON-serializable.") from exc
+        if len(serialized) > MAX_TOOL_ARGUMENT_CHARS:
+            raise ValueError(
+                f"Tool arguments exceed {MAX_TOOL_ARGUMENT_CHARS} serialized characters."
+            )
+        properties = self.parameters.get("properties", {})
+        required = self.parameters.get("required", [])
+        missing = [name for name in required if name not in arguments]
+        if missing:
+            raise ValueError("Missing required tool arguments: " + ", ".join(missing))
+        if self.parameters.get("additionalProperties", False) is False:
+            unknown = sorted(set(arguments) - set(properties))
+            if unknown:
+                raise ValueError("Unknown tool arguments: " + ", ".join(unknown))
+        expected_types: dict[str, type[Any] | tuple[type[Any], ...]] = {
+            "array": list,
+            "boolean": bool,
+            "integer": int,
+            "number": (int, float),
+            "object": dict,
+            "string": str,
+        }
+        for name, value in arguments.items():
+            definition = properties.get(name)
+            if not isinstance(definition, dict) or "type" not in definition:
+                continue
+            expected = expected_types.get(definition["type"])
+            if expected is not None and (
+                not isinstance(value, expected)
+                or definition["type"] in {"integer", "number"} and isinstance(value, bool)
+            ):
+                raise ValueError(f"Tool argument '{name}' must be {definition['type']}.")
+
     def schema(self) -> dict[str, Any]:
         return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": self.parameters,
-            "risk_level": "dynamic" if callable(self.risk) else int(self.risk),
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {**self.parameters, "additionalProperties": False},
+            },
         }
 
 
@@ -87,21 +138,27 @@ def default_registry(
         path = registry.resolve_path(str(arguments.get("path", ".")))
         if not path.is_dir():
             raise ValueError(f"Not a directory: {path}")
-        return "\n".join(
-            str(item.relative_to(registry.workspace))
-            for item in sorted(path.iterdir(), key=lambda item: item.name)
+        entries = heapq.nsmallest(
+            MAX_LIST_ENTRIES + 1, path.iterdir(), key=lambda item: item.name
         )
+        rendered = [
+            str(item.relative_to(registry.workspace)) for item in entries[:MAX_LIST_ENTRIES]
+        ]
+        if len(entries) > MAX_LIST_ENTRIES:
+            rendered.append(f"...[truncated after {MAX_LIST_ENTRIES} entries]")
+        return "\n".join(rendered)
 
     def read_file(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments["path"]))
         try:
-            max_chars = min(int(arguments.get("max_chars", 20_000)), 100_000)
+            max_chars = min(max(int(arguments.get("max_chars", 20_000)), 1), MAX_FILE_CHARS)
         except (TypeError, ValueError):
             max_chars = 20_000
         try:
-            return path.read_text(encoding="utf-8")[:max_chars]
+            with path.open("r", encoding="utf-8") as stream:
+                return stream.read(max_chars)
         except UnicodeDecodeError:
-            raise ValueError(f"File '{path.name}' is binary or not valid UTF-8.")
+            raise ValueError(f"File '{path.name}' is binary or not valid UTF-8.") from None
 
     def search_text(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments.get("path", ".")))
@@ -117,21 +174,36 @@ def default_registry(
             if any(part in {".git", "__pycache__", ".pytest_cache"} for part in candidate.parts):
                 continue
             try:
-                text = candidate.read_text(encoding="utf-8")
+                resolved_candidate = candidate.resolve()
+                if (
+                    resolved_candidate != registry.workspace
+                    and registry.workspace not in resolved_candidate.parents
+                ):
+                    continue
+                if resolved_candidate.stat().st_size > MAX_SEARCH_FILE_BYTES:
+                    continue
+                stream = resolved_candidate.open("r", encoding="utf-8")
+            except OSError:
+                continue
+            try:
+                with stream:
+                    for line_number, line in enumerate(stream, 1):
+                        if pattern.search(line):
+                            relative = candidate.relative_to(registry.workspace)
+                            matches.append(f"{relative}:{line_number}:{line.rstrip()[:500]}")
+                            if len(matches) >= 200:
+                                break
             except (UnicodeDecodeError, OSError):
                 continue
-            for line_number, line in enumerate(text.splitlines(), 1):
-                if pattern.search(line):
-                    relative = candidate.relative_to(registry.workspace)
-                    matches.append(f"{relative}:{line_number}:{line[:500]}")
-                    if len(matches) >= 200:
-                        break
         return "\n".join(matches)
 
     def git_status(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments.get("path", ".")))
-        result = subprocess.run(
-            ["git", "-C", str(path), "status", "--short", "--branch"],
+        git = shutil.which("git")
+        if not git:
+            raise RuntimeError("git is not installed or not available on PATH.")
+        result = subprocess.run(  # noqa: S603 - fixed Git status argv
+            [git, "-C", str(path), "status", "--short", "--branch"],
             capture_output=True,
             text=True,
             timeout=60,
@@ -144,32 +216,36 @@ def default_registry(
     def write_file(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments["path"]))
         content = str(arguments["content"])
-        if path.exists():
-            raise FileExistsError("Refusing to overwrite an existing file.")
+        if len(content) > MAX_EDIT_CHARS:
+            raise ValueError(f"Refusing to write more than {MAX_EDIT_CHARS} characters.")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            raise ValueError(f"Could not create parent directory: {exc}")
-        path.write_text(content, encoding="utf-8")
+            raise ValueError(f"Could not create parent directory: {exc}") from exc
+        try:
+            with path.open("x", encoding="utf-8") as stream:
+                stream.write(content)
+        except FileExistsError:
+            raise FileExistsError("Refusing to overwrite an existing file.") from None
         return f"Created {path.relative_to(registry.workspace)} ({len(content)} characters)."
 
     def command_risk(arguments: dict[str, Any]) -> RiskLevel:
         argv = arguments.get("argv")
-        valid_argv = (
-            isinstance(argv, list)
-            and bool(argv)
-            and all(isinstance(item, str) for item in argv)
-        )
-        if not valid_argv:
+        if (
+            not isinstance(argv, list)
+            or not argv
+            or not all(isinstance(item, str) for item in argv)
+        ):
             return RiskLevel.PROHIBITED
-        executable = argv[0]
-        if executable == "git" and len(argv) >= 2:
-            if argv[1] in {"status", "diff", "log"}:
+        command = [str(item) for item in argv]
+        executable = command[0]
+        if executable == "git" and len(command) >= 2:
+            if command[1] in {"status", "diff", "log"}:
                 return RiskLevel.OBSERVE
             return RiskLevel.PROHIBITED
         if executable == "rg":
             return RiskLevel.OBSERVE
-        if executable in {"python", "python3"} and argv[1:3] in (
+        if executable in {"python", "python3"} and command[1:3] in (
             ["-m", "pytest"],
             ["-m", "compileall"],
         ):
@@ -214,27 +290,59 @@ def default_registry(
         if not isinstance(raw_argv, list) or not all(isinstance(item, str) for item in raw_argv):
             raise ValueError("argv must be a non-empty array of strings.")
         argv = validate_command(raw_argv)
-        cwd = registry.resolve_path(str(arguments.get("cwd", ".")))
+        resolved_cwd = registry.resolve_path(str(arguments.get("cwd", ".")))
+        process_cwd: Path | None = resolved_cwd
         try:
             timeout = min(max(float(arguments.get("timeout", 30)), 1), 60)
         except (TypeError, ValueError):
             timeout = 30.0
-        env_path = os.environ.get("PATH", "")
-        safe_path = f"{env_path}:/usr/local/bin:/usr/bin:/bin" if env_path else "/usr/local/bin:/usr/bin:/bin"
-        
+        safe_path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
         if sandbox == "docker":
+            relative_cwd = resolved_cwd.relative_to(workspace.resolve())
+            docker = shutil.which("docker", path=safe_path)
+            if not docker:
+                raise RuntimeError("Docker is not installed or not available on PATH.")
             argv = [
-                "docker", "run", "--rm", "-i",
-                "--network", "none",
-                "-v", f"{workspace.resolve()}:/workspace",
-                "-w", f"/workspace/{cwd.relative_to(workspace.resolve()) if cwd.is_relative_to(workspace.resolve()) else ''}",
-                "python:3.12-slim"
+                docker,
+                "run",
+                "--rm",
+                "--pull=never",
+                "--network=none",
+                "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "--pids-limit=64",
+                "--memory=1g",
+                "--cpus=1.0",
+                f"--user={os.getuid()}:{os.getgid()}",
+                "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=512m",
+                "--mount",
+                f"type=bind,src={workspace.resolve()},dst=/workspace,readonly",
+                "--env=HOME=/tmp",
+                "--env=PYTHONPATH=/workspace/src",
+                "--env=PYTHONPYCACHEPREFIX=/tmp/pycache",
+                "--env=PYTHONDONTWRITEBYTECODE=1",
+                "--workdir",
+                f"/workspace/{relative_cwd}",
+                SANDBOX_IMAGE,
             ] + argv
-            cwd = None  # Docker handles CWD
-            
-        result = subprocess.run(
+            process_cwd = None
+        else:
+            executable = (
+                sys.executable
+                if argv[0] in {"python", "python3"}
+                else shutil.which(argv[0], path=safe_path)
+            )
+            if not executable:
+                raise RuntimeError(
+                    f"Command is not installed or available on PATH: {argv[0]}"
+                )
+            argv[0] = executable
+
+        result = subprocess.run(  # noqa: S603 - argv is validated against an allowlist
             argv,
-            cwd=cwd,
+            cwd=process_cwd,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -271,6 +379,8 @@ def default_registry(
 
     def patch_preview(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments["path"]))
+        if path.stat().st_size > MAX_EDIT_CHARS:
+            raise ValueError(f"Refusing to edit files larger than {MAX_EDIT_CHARS} bytes.")
         current = path.read_text(encoding="utf-8")
         old_text = str(arguments["old_text"])
         new_text = str(arguments["new_text"])
@@ -279,6 +389,8 @@ def default_registry(
         if current.count(old_text) != 1:
             raise ValueError("old_text must match exactly once in the current file.")
         updated = current.replace(old_text, new_text, 1)
+        if len(updated.encode("utf-8")) > MAX_EDIT_CHARS:
+            raise ValueError(f"Patched file would exceed {MAX_EDIT_CHARS} bytes.")
         relative = str(path.relative_to(registry.workspace))
         digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
         diff = "".join(
@@ -289,18 +401,34 @@ def default_registry(
                 tofile=f"b/{relative}",
             )
         )
-        return f"current_sha256={digest}\n{diff}"[:100_000]
+        preview = f"current_sha256={digest}\n{diff}"
+        if len(preview) > MAX_PATCH_PREVIEW_CHARS:
+            raise ValueError(
+                f"Patch preview exceeds {MAX_PATCH_PREVIEW_CHARS} characters; split the edit."
+            )
+        return preview
 
     def apply_patch(arguments: dict[str, Any]) -> str:
-        preview = patch_preview(arguments)
+        expected_digest = arguments.get("_approved_sha256")
+        if not isinstance(expected_digest, str):
+            raise PermissionError("Patch execution requires an approved content digest.")
         path = registry.resolve_path(str(arguments["path"]))
+        if path.stat().st_size > MAX_EDIT_CHARS:
+            raise ValueError(f"Refusing to edit files larger than {MAX_EDIT_CHARS} bytes.")
         current = path.read_text(encoding="utf-8")
+        digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
+        if digest != expected_digest:
+            raise PermissionError("The target changed after approval; request a new approval.")
+        old_text = str(arguments["old_text"])
+        if not old_text or current.count(old_text) != 1:
+            raise ValueError("old_text must match exactly once in the approved file.")
         updated = current.replace(
-            str(arguments["old_text"]),
+            old_text,
             str(arguments["new_text"]),
             1,
         )
-        digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
+        if len(updated.encode("utf-8")) > MAX_EDIT_CHARS:
+            raise ValueError(f"Patched file would exceed {MAX_EDIT_CHARS} bytes.")
         backup = registry.resolve_path(f".hybrid-agent/backups/{digest}.bak")
         backup.parent.mkdir(parents=True, exist_ok=True)
         if not backup.exists():
@@ -322,7 +450,7 @@ def default_registry(
             raise
         return (
             f"Applied approved patch to {path.relative_to(registry.workspace)}. "
-            f"Backup: {backup.relative_to(registry.workspace)}\n{preview}"
+            f"Backup: {backup.relative_to(registry.workspace)}"
         )
 
     registry.register(

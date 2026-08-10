@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .models import ImageInput
 
-
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 
