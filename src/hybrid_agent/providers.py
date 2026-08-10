@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import json
+import asyncio
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -17,7 +19,7 @@ class OfflineProvider:
     name = "offline"
     is_cloud = False
 
-    def complete(self, messages: list[Message], tools: list[dict[str, object]]) -> ModelTurn:
+    async def complete(self, messages: list[Message], tools: list[dict[str, object]]) -> ModelTurn:
         prompt = next(
             (message.content for message in reversed(messages) if message.role == "user"),
             "",
@@ -42,44 +44,39 @@ class OllamaProvider:
         timeout: float = 120.0,
     ) -> None:
         self.model = model
-        self.base_url = base_url.rstrip("/")
+        self.endpoint = f"{base_url.rstrip('/')}/api/chat"
         self.timeout = timeout
         self.name = f"ollama:{model}"
         self.is_cloud = False
 
-    def complete(self, messages: list[Message], tools: list[dict[str, object]]) -> ModelTurn:
-        ollama_tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool["description"],
-                    "parameters": tool["parameters"],
-                },
-            }
-            for tool in tools
-        ]
-        payload = {
-            "model": self.model,
-            "stream": False,
-            "messages": [self._ollama_message(message) for message in messages],
-            "tools": ollama_tools,
-        }
+    async def complete(self, messages: list[Message], tools: list[dict[str, object]]) -> ModelTurn:
+        payload = {"model": self.model, "stream": False, "messages": []}
+        for message in messages:
+            msg: dict[str, Any] = {"role": message.role, "content": message.content}
+            if message.images:
+                msg["images"] = [base64.b64encode(image.data).decode("ascii") for image in message.images]
+            payload["messages"].append(msg)
+        if tools:
+            payload["tools"] = tools
+
         request = Request(
-            f"{self.base_url}/api/chat",
+            self.endpoint,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"},
-            method="POST",
         )
         try:
-            with urlopen(request, timeout=self.timeout) as response:
-                body = json.loads(response.read().decode("utf-8"))
+            def fetch() -> Any:
+                with urlopen(request, timeout=self.timeout) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            body = await asyncio.to_thread(fetch)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Ollama returned invalid JSON: {exc.msg}") from exc
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Ollama returned HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(
-                f"Cannot reach Ollama at {self.base_url}. Is `ollama serve` running?"
+                f"Cannot reach Ollama at {self.endpoint}. Is `ollama serve` running?"
             ) from exc
 
         message = body.get("message", {})

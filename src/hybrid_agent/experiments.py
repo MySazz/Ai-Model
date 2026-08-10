@@ -82,7 +82,10 @@ def write_blocked_baseline(
         "cases_scored": 0,
         "score": None,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ExperimentError(f"Failed to create baseline output directory: {exc}") from exc
     output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
 

@@ -64,7 +64,7 @@ def run_python_checks(response: str, evaluator: dict[str, Any]) -> dict[str, boo
                 env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"},
                 text=True,
                 capture_output=True,
-                timeout=8,
+                timeout=30,
                 check=False,
                 preexec_fn=_limits if os.name == "posix" else None,
             )

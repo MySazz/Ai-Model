@@ -35,7 +35,10 @@ class SourceMatch:
 class ResearchStore:
     def __init__(self, path: Path) -> None:
         self.path = path
-        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(f"Could not initialize ResearchStore directory: {exc}") from exc
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -119,7 +122,10 @@ class ResearchStore:
         resolved = path.resolve()
         if resolved != root and root not in resolved.parents:
             raise PermissionError("Research source escapes the configured workspace.")
-        content = resolved.read_text(encoding="utf-8")
+        try:
+            content = resolved.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raise ValueError(f"File '{resolved.name}' is binary or not valid UTF-8.")
         return self.add_text(
             title=title or resolved.name,
             uri=str(resolved.relative_to(root)),

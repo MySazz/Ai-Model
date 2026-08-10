@@ -22,12 +22,15 @@ failures.
 The repository currently includes:
 
 - a provider-neutral CLI agent with local Ollama support;
-- workspace-confined tools, approvals, privacy checks, audit history, memory,
-  research snapshots, vision inputs, and reversible text editing;
+- dynamic Model Context Protocol (MCP) client integration (`--mcp-server`);
+- workspace-confined tools, approvals, privacy checks, audit history, memory, research snapshots, vision inputs, and reversible text editing;
+- Docker container sandboxing for secure tool execution (`--sandbox docker`);
+- vector-embedded semantic memory and research recall via local Ollama embeddings;
+- automated schema migration engine for SQLite datastores;
 - deterministic dataset validation and family-held-out splitting;
 - reproducible QLoRA runners for Google Colab;
 - semantic, policy, and executable evaluation harnesses; and
-- 93 automated repository tests.
+- comprehensive pytest suites for automated validation.
 
 The latest Qwen3-4B executable-training adapter was rejected. Although validation
 loss improved, it remained at 1/4 executable development tasks and regressed the
@@ -45,7 +48,13 @@ for exact hashes, scores, and experiment history.
 | Execution-guided rejection and diversity pipeline | Complete |
 | Multi-candidate Colab generation baseline | Complete; corpus gate failed |
 | Execution-feedback candidate repair | Complete; corpus gate failed |
-| Teacher-seeded executable curriculum expansion | Next |
+| Dynamic MCP Client Capability | Complete |
+| Docker / Firecracker Tool Sandboxing | Scaffolded |
+| Vector Embeddings (Semantic Recall) | Scaffolded |
+| Async Architecture Refactoring | Scaffolded |
+| SQLite Schema Migration Engine | Scaffolded |
+| Comprehensive Pytest Suites | Next |
+| Teacher-seeded executable curriculum expansion | Planned |
 | Balanced capability and safety replay | Planned |
 | New frozen unseen holdout: 80% overall, 70% per capability, zero safety failures | Planned |
 | Broader coding, research, vision, and infrastructure benchmarks | Planned |

@@ -70,6 +70,8 @@ def filter_candidates(
     seen_candidate_ids: set[str] = set()
     accepted: list[dict[str, Any]] = []
     accepted_texts: list[str] = []
+    accepted_fingerprints: set[str] = set()
+    accepted_shingles_list: list[set[tuple[str, ...]]] = []
     decisions: list[dict[str, Any]] = []
     rejection_counts: Counter[str] = Counter()
     critical_failures = 0
@@ -114,10 +116,16 @@ def filter_candidates(
         if _repeats_excessively(response):
             reasons.append("excessive_repetition")
         fingerprint = _fingerprint(response)
-        if fingerprint and any(fingerprint == _fingerprint(text) for text in accepted_texts):
+        shingles = _shingles(response)
+        if fingerprint and fingerprint in accepted_fingerprints:
             reasons.append("exact_duplicate")
-        elif any(_similarity(response, text) >= near_duplicate_threshold for text in accepted_texts):
-            reasons.append("near_duplicate")
+        else:
+            for acc_shingles in accepted_shingles_list:
+                union = shingles | acc_shingles
+                similarity = len(shingles & acc_shingles) / len(union) if union else 1.0
+                if similarity >= near_duplicate_threshold:
+                    reasons.append("near_duplicate")
+                    break
         if reasons:
             for reason in set(reasons):
                 rejection_counts[reason] += 1
@@ -149,6 +157,8 @@ def filter_candidates(
         }
         accepted.append(output)
         accepted_texts.append(response)
+        accepted_fingerprints.add(fingerprint)
+        accepted_shingles_list.append(shingles)
         if candidate.get("calibration_only") is True:
             calibration_candidates_accepted += 1
         accepted_by_capability[capability] += 1

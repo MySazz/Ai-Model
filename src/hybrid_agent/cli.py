@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+import asyncio
 from pathlib import Path
 
 from . import __version__
@@ -26,8 +27,8 @@ from .vision import load_image
 def default_state_dir() -> Path:
     configured = os.environ.get("HYBRID_AGENT_HOME")
     if configured:
-        return Path(configured).expanduser()
-    return Path.cwd() / ".hybrid-agent"
+        return Path(configured).expanduser().resolve()
+    return (Path.cwd() / ".hybrid-agent").resolve()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +52,18 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--user-id", default="local")
     chat.add_argument("--workspace-id", default="default")
     chat.add_argument("--no-memory", action="store_true")
+    chat.add_argument(
+        "--sandbox",
+        choices=("none", "docker"),
+        default="none",
+        help="Containerize tool execution for safety (default: none)"
+    )
+    chat.add_argument(
+        "--mcp-server",
+        action="append",
+        default=[],
+        help="Command to run an MCP server (e.g. 'npx -y @modelcontextprotocol/server-github'); repeat for multiple servers"
+    )
     chat.add_argument(
         "--image",
         type=Path,
@@ -198,15 +211,36 @@ def run_chat(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 2
 
+    from .mcp_client import MCPClient
+    import shlex
+
     research = ResearchStore(args.state_dir / "research.db")
+    tools_registry = default_registry(
+        workspace,
+        research,
+        user_id=args.user_id,
+        workspace_id=args.workspace_id,
+        sandbox=args.sandbox,
+    )
+
+    mcp_clients: list[MCPClient] = []
+    for cmd_str in args.mcp_server:
+        cmd = shlex.split(cmd_str)
+        try:
+            client = MCPClient(cmd)
+            for tool in client.list_tools():
+                tools_registry.register(tool)
+            mcp_clients.append(client)
+            print(f"Loaded MCP server: {cmd[0]}")
+        except Exception as exc:
+            print(f"Failed to start MCP server {cmd_str}: {exc}", file=sys.stderr)
+            for c in mcp_clients:
+                c.close()
+            return 2
+
     session = AgentSession(
         provider=provider,
-        tools=default_registry(
-            workspace,
-            research,
-            user_id=args.user_id,
-            workspace_id=args.workspace_id,
-        ),
+        tools=tools_registry,
         audit=AuditStore(args.state_dir / "agent.db"),
         policy=PermissionPolicy(),
         memory=None if args.no_memory else MemoryStore(args.state_dir / "memory.db"),
@@ -220,29 +254,33 @@ def run_chat(args: argparse.Namespace) -> int:
     except (OSError, ValueError, PermissionError) as exc:
         print(f"Image error: {exc}", file=sys.stderr)
         return 2
-    if args.prompt:
-        try:
-            print(session.run(args.prompt, images=images))
-        except (RuntimeError, KeyError, PermissionError) as exc:
-            print(f"Agent error: {exc}", file=sys.stderr)
-            return 1
-        return 0
+    try:
+        if args.prompt:
+            try:
+                print(asyncio.run(session.run(args.prompt, images=images)))
+            except (RuntimeError, KeyError, PermissionError) as exc:
+                print(f"Agent error: {exc}", file=sys.stderr)
+                return 1
+            return 0
 
-    print(f"Hybrid Agent ({provider.name}) — type /quit to exit")
-    while True:
-        try:
-            prompt = input("you> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return 0
-        if prompt in {"/quit", "/exit"}:
-            return 0
-        if not prompt:
-            continue
-        try:
-            print(f"agent> {session.run(prompt, images=images)}")
-        except (RuntimeError, KeyError, PermissionError) as exc:
-            print(f"Agent error: {exc}", file=sys.stderr)
+        print(f"Hybrid Agent ({provider.name}) — type /quit to exit")
+        while True:
+            try:
+                prompt = input("you> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return 0
+            if prompt in {"/quit", "/exit"}:
+                return 0
+            if not prompt:
+                continue
+            try:
+                print(f"agent> {asyncio.run(session.run(prompt, images=images))}")
+            except (RuntimeError, KeyError, PermissionError) as exc:
+                print(f"Agent error: {exc}", file=sys.stderr)
+    finally:
+        for client in mcp_clients:
+            client.close()
 
 
 def run_audit(args: argparse.Namespace) -> int:
@@ -406,8 +444,8 @@ def run_experiment(args: argparse.Namespace) -> int:
             return 0
         output = args.output if args.output.is_absolute() else workspace / args.output
         resolved_output = output.resolve()
-        if resolved_output != workspace and workspace not in resolved_output.parents:
-            raise ExperimentError(f"Baseline output escapes workspace: {output}")
+        if workspace not in resolved_output.parents:
+            raise ExperimentError(f"Baseline output escapes or equals workspace: {output}")
         payload = write_blocked_baseline(
             verified, resolved_output, reason=args.reason, evidence=args.evidence
         )
@@ -433,9 +471,12 @@ def run_evaluation(args: argparse.Namespace) -> int:
         payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
         if args.output:
             output = (args.output if args.output.is_absolute() else workspace / args.output).resolve()
-            if output != workspace and workspace not in output.parents:
-                raise EvaluationError(f"Evaluation output escapes workspace: {args.output}")
-            output.parent.mkdir(parents=True, exist_ok=True)
+            if workspace not in output.parents:
+                raise EvaluationError(f"Evaluation output escapes or equals workspace: {args.output}")
+            try:
+                output.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise EvaluationError(f"Failed to create evaluation output directory: {exc}") from exc
             output.write_text(payload, encoding="utf-8")
         print(payload, end="")
         return 0 if not report["critical_failures"] else 1

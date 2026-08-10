@@ -38,9 +38,7 @@ class ModelProvider(Protocol):
     name: str
     is_cloud: bool
 
-    def complete(
-        self,
-        messages: list[Message],
-        tools: list[dict[str, Any]],
+    async def complete(
+        self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         """Return the model's next response or requested tool calls."""

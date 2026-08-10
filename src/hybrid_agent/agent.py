@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from dataclasses import dataclass, field
 from typing import Callable
 from uuid import uuid4
@@ -40,12 +41,12 @@ class AgentSession:
     approval_handler: ApprovalHandler | None = None
     cloud_approval_handler: CloudApprovalHandler | None = None
     session_id: str = field(default_factory=lambda: str(uuid4()))
-    max_steps: int = 8
+    max_steps: int = 20
     messages: list[Message] = field(
         default_factory=lambda: [Message(role="system", content=SYSTEM_PROMPT)]
     )
 
-    def run(self, prompt: str, images: tuple[ImageInput, ...] = ()) -> str:
+    async def run(self, prompt: str, images: tuple[ImageInput, ...] = ()) -> str:
         self._authorize_cloud_text(prompt, context="prompt")
         if images and self.provider.is_cloud:
             approved = bool(
@@ -72,7 +73,7 @@ class AgentSession:
         )
 
         for _ in range(self.max_steps):
-            turn = self.provider.complete(self.messages, self.tools.schemas())
+            turn = await self.provider.complete(self.messages, self.tools.schemas())
             if not turn.tool_calls:
                 answer = turn.content or "The model returned an empty response."
                 self.messages.append(Message(role="assistant", content=answer))
@@ -88,7 +89,7 @@ class AgentSession:
                 self.messages.append(Message(role="assistant", content=turn.content))
 
             for call in turn.tool_calls:
-                result = self._execute_tool(call.name, call.arguments)
+                result = await self._execute_tool(call.name, call.arguments)
                 result = self._prepare_tool_result_for_provider(result)
                 self.messages.append(
                     Message(
@@ -99,7 +100,9 @@ class AgentSession:
                     )
                 )
 
-        raise RuntimeError(f"Agent exceeded its {self.max_steps}-step safety limit.")
+        answer = f"[Agent paused: Exceeded {self.max_steps}-step safety limit without completing the task.]"
+        self.messages.append(Message(role="assistant", content=answer))
+        return answer
 
     def _append_relevant_memory(self, prompt: str) -> None:
         if not self.memory:
@@ -165,7 +168,7 @@ class AgentSession:
         self._authorize_cloud_text(result, context="tool result")
         return result
 
-    def _execute_tool(self, name: str, arguments: dict[str, object]) -> str:
+    async def _execute_tool(self, name: str, arguments: dict[str, object]) -> str:
         tool = self.tools.get(name)
         risk = tool.assess_risk(arguments)
         decision = self.policy.decide(risk)
@@ -215,7 +218,7 @@ class AgentSession:
             return decision.reason
 
         try:
-            result = tool.handler(arguments)
+            result = await asyncio.to_thread(tool.handler, arguments)
         except Exception as exc:
             self.audit.record(
                 session_id=self.session_id,
