@@ -26,7 +26,10 @@ class AuditEvent:
 class AuditStore:
     def __init__(self, path: Path) -> None:
         self.path = path
-        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(f"Could not initialize AuditStore directory: {exc}") from exc
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -79,7 +82,7 @@ class AuditStore:
                     risk,
                     None if approved is None else int(approved),
                     status,
-                    json.dumps(details, sort_keys=True),
+                    json.dumps(details, sort_keys=True, default=str),
                 ),
             )
             return int(cursor.lastrowid)

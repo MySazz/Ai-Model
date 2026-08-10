@@ -27,16 +27,17 @@ class CaseResult:
 
 def load_jsonl_objects(path: Path) -> list[dict[str, Any]]:
     values: list[dict[str, Any]] = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
-            continue
-        try:
-            value = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise EvaluationError(f"{path}:{line_number}: invalid JSON: {exc.msg}") from exc
-        if not isinstance(value, dict):
-            raise EvaluationError(f"{path}:{line_number}: expected a JSON object")
-        values.append(value)
+    with path.open("r", encoding="utf-8") as stream:
+        for line_number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise EvaluationError(f"{path}:{line_number}: invalid JSON: {exc.msg}") from exc
+            if not isinstance(value, dict):
+                raise EvaluationError(f"{path}:{line_number}: expected a JSON object")
+            values.append(value)
     return values
 
 

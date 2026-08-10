@@ -16,7 +16,7 @@ class ScriptedProvider:
     def __init__(self) -> None:
         self.turn = 0
 
-    def complete(
+    async def complete(
         self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         self.turn += 1
@@ -30,7 +30,8 @@ class ScriptedProvider:
         return ModelTurn(content="Verified from the workspace.")
 
 
-def test_agent_executes_tool_and_records_audit(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_agent_executes_tool_and_records_audit(tmp_path: Path) -> None:
     (tmp_path / "note.txt").write_text("evidence", encoding="utf-8")
     audit = AuditStore(tmp_path / "state" / "agent.db")
     session = AgentSession(
@@ -39,7 +40,7 @@ def test_agent_executes_tool_and_records_audit(tmp_path: Path) -> None:
         audit=audit,
     )
 
-    assert session.run("Read the note") == "Verified from the workspace."
+    assert await session.run("Read the note") == "Verified from the workspace."
     events = audit.recent()
     assert any(event.event_type == "tool" and event.status == "completed" for event in events)
 
@@ -51,7 +52,7 @@ class WriteProvider:
     def __init__(self) -> None:
         self.turn = 0
 
-    def complete(
+    async def complete(
         self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         self.turn += 1
@@ -68,24 +69,26 @@ class WriteProvider:
         return ModelTurn(content="Done.")
 
 
-def test_approved_tool_executes(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_approved_tool_executes(tmp_path: Path) -> None:
     session = AgentSession(
         provider=WriteProvider(),
         tools=default_registry(tmp_path),
         audit=AuditStore(tmp_path / "state" / "agent.db"),
         approval_handler=lambda tool, arguments, reason: True,
     )
-    assert session.run("Create it") == "Done."
+    assert await session.run("Create it") == "Done."
     assert (tmp_path / "created.txt").read_text(encoding="utf-8") == "approved"
 
 
-def test_unapproved_tool_does_not_execute(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_unapproved_tool_does_not_execute(tmp_path: Path) -> None:
     session = AgentSession(
         provider=WriteProvider(),
         tools=default_registry(tmp_path),
         audit=AuditStore(tmp_path / "state" / "agent.db"),
     )
-    assert session.run("Create it") == "Done."
+    assert await session.run("Create it") == "Done."
     assert not (tmp_path / "created.txt").exists()
 
 
@@ -93,37 +96,39 @@ class CloudProvider:
     name = "test-cloud"
     is_cloud = True
 
-    def complete(
+    async def complete(
         self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         return ModelTurn(content="cloud response")
 
 
-def test_cloud_provider_blocks_secret_like_prompt(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_cloud_provider_blocks_secret_like_prompt(tmp_path: Path) -> None:
     session = AgentSession(
         provider=CloudProvider(),
         tools=default_registry(tmp_path),
         audit=AuditStore(tmp_path / "state" / "agent.db"),
     )
     with pytest.raises(PermissionError, match="local-only"):
-        session.run("api_key=super-secret-value")
+        await session.run("api_key=super-secret-value")
 
 
-def test_cloud_provider_requires_approval_for_sensitive_prompt(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_cloud_provider_requires_approval_for_sensitive_prompt(tmp_path: Path) -> None:
     session = AgentSession(
         provider=CloudProvider(),
         tools=default_registry(tmp_path),
         audit=AuditStore(tmp_path / "state" / "agent.db"),
         cloud_approval_handler=lambda level, reasons: True,
     )
-    assert session.run("Review this private configuration") == "cloud response"
+    assert await session.run("Review this private configuration") == "cloud response"
 
 
 class MemoryAwareProvider:
     name = "memory-aware"
     is_cloud = False
 
-    def complete(
+    async def complete(
         self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         memory_messages = [
@@ -135,7 +140,8 @@ class MemoryAwareProvider:
         return ModelTurn(content="I used the approved memory.")
 
 
-def test_relevant_memory_is_injected_with_provenance(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_relevant_memory_is_injected_with_provenance(tmp_path: Path) -> None:
     memory = MemoryStore(tmp_path / "state" / "memory.db")
     memory.add("The project is CLI-first", workspace_id="agent")
     session = AgentSession(
@@ -145,10 +151,11 @@ def test_relevant_memory_is_injected_with_provenance(tmp_path: Path) -> None:
         memory=memory,
         workspace_id="agent",
     )
-    assert session.run("What is our CLI project approach?") == "I used the approved memory."
+    assert await session.run("What is our CLI project approach?") == "I used the approved memory."
 
 
-def test_cloud_image_requires_explicit_disclosure_approval(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_cloud_image_requires_explicit_disclosure_approval(tmp_path: Path) -> None:
     session = AgentSession(
         provider=CloudProvider(),
         tools=default_registry(tmp_path),
@@ -161,7 +168,7 @@ def test_cloud_image_requires_explicit_disclosure_approval(tmp_path: Path) -> No
         sha256="digest",
     )
     with pytest.raises(PermissionError, match="image content"):
-        session.run("Inspect this screenshot", images=(image,))
+        await session.run("Inspect this screenshot", images=(image,))
 
 
 class PatchProvider:
@@ -171,7 +178,7 @@ class PatchProvider:
     def __init__(self) -> None:
         self.turn = 0
 
-    def complete(
+    async def complete(
         self, messages: list[Message], tools: list[dict[str, object]]
     ) -> ModelTurn:
         self.turn += 1
@@ -192,7 +199,8 @@ class PatchProvider:
         return ModelTurn(content="Patch turn complete.")
 
 
-def test_patch_is_denied_if_file_changes_after_preview(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_patch_is_denied_if_file_changes_after_preview(tmp_path: Path) -> None:
     target = tmp_path / "target.txt"
     target.write_text("before\noriginal context\n", encoding="utf-8")
 
@@ -207,6 +215,6 @@ def test_patch_is_denied_if_file_changes_after_preview(tmp_path: Path) -> None:
         audit=audit,
         approval_handler=change_during_approval,
     )
-    assert session.run("Patch target") == "Patch turn complete."
+    assert await session.run("Patch target") == "Patch turn complete."
     assert target.read_text(encoding="utf-8") == "before\nchanged context\n"
     assert any(event.status == "approval_required" for event in audit.recent())

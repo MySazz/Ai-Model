@@ -6,8 +6,10 @@ import difflib
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -77,6 +79,7 @@ def default_registry(
     *,
     user_id: str = "local",
     workspace_id: str = "default",
+    sandbox: str = "none",
 ) -> ToolRegistry:
     registry = ToolRegistry(workspace)
 
@@ -91,8 +94,14 @@ def default_registry(
 
     def read_file(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments["path"]))
-        max_chars = min(int(arguments.get("max_chars", 20_000)), 100_000)
-        return path.read_text(encoding="utf-8")[:max_chars]
+        try:
+            max_chars = min(int(arguments.get("max_chars", 20_000)), 100_000)
+        except (TypeError, ValueError):
+            max_chars = 20_000
+        try:
+            return path.read_text(encoding="utf-8")[:max_chars]
+        except UnicodeDecodeError:
+            raise ValueError(f"File '{path.name}' is binary or not valid UTF-8.")
 
     def search_text(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments.get("path", ".")))
@@ -104,6 +113,8 @@ def default_registry(
         candidates = [path] if path.is_file() else path.rglob("*")
         for candidate in candidates:
             if len(matches) >= 200 or not candidate.is_file():
+                continue
+            if any(part in {".git", "__pycache__", ".pytest_cache"} for part in candidate.parts):
                 continue
             try:
                 text = candidate.read_text(encoding="utf-8")
@@ -123,19 +134,22 @@ def default_registry(
             ["git", "-C", str(path), "status", "--short", "--branch"],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=60,
             check=False,
         )
         if result.returncode:
-            raise RuntimeError(result.stderr.strip() or "git status failed")
-        return result.stdout[:100_000]
+            return f"Error ({result.returncode}):\n{result.stderr[:20000]}"
+        return result.stdout[:20000]
 
     def write_file(arguments: dict[str, Any]) -> str:
         path = registry.resolve_path(str(arguments["path"]))
         content = str(arguments["content"])
         if path.exists():
             raise FileExistsError("Refusing to overwrite an existing file.")
-        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ValueError(f"Could not create parent directory: {exc}")
         path.write_text(content, encoding="utf-8")
         return f"Created {path.relative_to(registry.workspace)} ({len(content)} characters)."
 
@@ -201,7 +215,23 @@ def default_registry(
             raise ValueError("argv must be a non-empty array of strings.")
         argv = validate_command(raw_argv)
         cwd = registry.resolve_path(str(arguments.get("cwd", ".")))
-        timeout = min(max(float(arguments.get("timeout", 30)), 1), 60)
+        try:
+            timeout = min(max(float(arguments.get("timeout", 30)), 1), 60)
+        except (TypeError, ValueError):
+            timeout = 30.0
+        env_path = os.environ.get("PATH", "")
+        safe_path = f"{env_path}:/usr/local/bin:/usr/bin:/bin" if env_path else "/usr/local/bin:/usr/bin:/bin"
+        
+        if sandbox == "docker":
+            argv = [
+                "docker", "run", "--rm", "-i",
+                "--network", "none",
+                "-v", f"{workspace.resolve()}:/workspace",
+                "-w", f"/workspace/{cwd.relative_to(workspace.resolve()) if cwd.is_relative_to(workspace.resolve()) else ''}",
+                "python:3.12-slim"
+            ] + argv
+            cwd = None  # Docker handles CWD
+            
         result = subprocess.run(
             argv,
             cwd=cwd,
@@ -209,21 +239,27 @@ def default_registry(
             text=True,
             timeout=timeout,
             check=False,
-            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8"},
+            env={"PATH": safe_path, "LANG": "C.UTF-8"},
         )
         output = result.stdout
         if result.stderr:
-            output += ("\n" if output else "") + result.stderr
-        return f"exit_code={result.returncode}\n{output[:100_000]}"
+            output += "\n[stderr]\n" + result.stderr
+        if len(output) > 20000:
+            output = output[:20000] + "\n...[truncated due to length]"
+        return f"exit_code={result.returncode}\n{output}"
 
     def search_sources(arguments: dict[str, Any]) -> str:
         if research is None:
             raise RuntimeError("Research storage is not configured.")
+        try:
+            limit = min(int(arguments.get("limit", 20)), 50)
+        except (TypeError, ValueError):
+            limit = 20
         matches = research.search(
             str(arguments["query"]),
             user_id=user_id,
             workspace_id=workspace_id,
-            limit=min(int(arguments.get("limit", 20)), 50),
+            limit=limit,
         )
         return "\n".join(
             (

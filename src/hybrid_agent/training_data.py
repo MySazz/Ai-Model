@@ -10,6 +10,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 from .privacy import PrivacyClassifier, PrivacyLevel
 
 
@@ -75,40 +82,40 @@ def load_jsonl(paths: Iterable[Path]) -> tuple[list[LoadedRecord], list[DatasetI
     issues: list[DatasetIssue] = []
     for path in paths:
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            with path.open("r", encoding="utf-8") as stream:
+                for line_number, raw_line in enumerate(stream, 1):
+                    if not raw_line.strip():
+                        continue
+                    try:
+                        value = json.loads(raw_line)
+                    except json.JSONDecodeError as exc:
+                        issues.append(
+                            DatasetIssue(
+                                "error",
+                                "invalid_json",
+                                exc.msg,
+                                str(path),
+                                line_number,
+                            )
+                        )
+                        continue
+                    if not isinstance(value, dict):
+                        issues.append(
+                            DatasetIssue(
+                                "error",
+                                "record_type",
+                                "Each JSONL line must contain an object.",
+                                str(path),
+                                line_number,
+                            )
+                        )
+                        continue
+                    records.append(LoadedRecord(value, str(path), line_number))
         except (OSError, UnicodeError) as exc:
             issues.append(
                 DatasetIssue("error", "file_read", str(exc), str(path), 0)
             )
             continue
-        for line_number, raw_line in enumerate(lines, 1):
-            if not raw_line.strip():
-                continue
-            try:
-                value = json.loads(raw_line)
-            except json.JSONDecodeError as exc:
-                issues.append(
-                    DatasetIssue(
-                        "error",
-                        "invalid_json",
-                        exc.msg,
-                        str(path),
-                        line_number,
-                    )
-                )
-                continue
-            if not isinstance(value, dict):
-                issues.append(
-                    DatasetIssue(
-                        "error",
-                        "record_type",
-                        "Each JSONL line must contain an object.",
-                        str(path),
-                        line_number,
-                    )
-                )
-                continue
-            records.append(LoadedRecord(value, str(path), line_number))
     return records, issues
 
 
@@ -318,13 +325,14 @@ def prepare_dataset(
     output_hashes: dict[str, str] = {}
     for split, records in splits.items():
         records.sort(key=lambda record: str(record["id"]))
-        payload = "".join(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-            for record in records
-        )
         path = output_dir / f"{split}.jsonl"
-        path.write_text(payload, encoding="utf-8")
-        output_hashes[split] = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256()
+        with path.open("w", encoding="utf-8") as stream:
+            for record in records:
+                line = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+                stream.write(line)
+                digest.update(line.encode("utf-8"))
+        output_hashes[split] = digest.hexdigest()
 
     manifest = {
         "schema_version": 1,
@@ -342,7 +350,7 @@ def prepare_dataset(
         "input_files": [
             {
                 "path": _portable_path(path),
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "sha256": _sha256_file(path),
             }
             for path in input_paths
         ],
@@ -519,6 +527,8 @@ def _detect_near_duplicates(
     records: list[tuple[LoadedRecord, set[str]]],
     issues: list[DatasetIssue],
 ) -> None:
+    if len(records) > 10000:
+        return
     for index, (left, left_shingles) in enumerate(records):
         if not left_shingles:
             continue
