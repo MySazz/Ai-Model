@@ -15,6 +15,9 @@ class ExperimentError(RuntimeError):
     """Raised when an experiment cannot safely or reproducibly start."""
 
 
+_SPLIT_NAMES = frozenset({"train", "validation", "test"})
+
+
 @dataclass(frozen=True)
 class VerifiedExperiment:
     config_path: Path
@@ -52,13 +55,31 @@ def verify_experiment(config_path: Path, *, workspace: Path) -> VerifiedExperime
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ExperimentError(f"Could not read dataset manifest: {exc}") from exc
-    if manifest.get("validation", {}).get("valid") is not True:
+    if not isinstance(manifest, dict):
+        raise ExperimentError("Dataset manifest must be a JSON object.")
+    validation = manifest.get("validation")
+    if not isinstance(validation, dict) or validation.get("valid") is not True:
         raise ExperimentError("Dataset manifest does not record successful validation.")
-    for split, expected in manifest.get("output_sha256", {}).items():
+    output_hashes = manifest.get("output_sha256")
+    if not isinstance(output_hashes, dict) or not output_hashes:
+        raise ExperimentError("Dataset manifest requires output_sha256 entries.")
+    if set(output_hashes) != _SPLIT_NAMES:
+        raise ExperimentError("Dataset manifest must hash train, validation, and test splits.")
+    for split, expected_value in output_hashes.items():
+        expected = _validate_hash(expected_value, f"{split} split hash")
         _match_hash(manifest_path.parent / f"{split}.jsonl", expected, f"{split} split")
-    for source in manifest.get("input_files", []):
-        source_path = _inside(workspace / source["path"], workspace, "dataset source")
-        _match_hash(source_path, source["sha256"], "dataset source")
+    sources = manifest.get("input_files")
+    if not isinstance(sources, list) or not sources:
+        raise ExperimentError("Dataset manifest input_files must be a non-empty list.")
+    for source in sources:
+        if not isinstance(source, dict):
+            raise ExperimentError("Dataset manifest sources must be objects.")
+        source_name = source.get("path")
+        if not isinstance(source_name, str) or not source_name:
+            raise ExperimentError("Dataset manifest source paths must be non-empty strings.")
+        source_hash = _validate_hash(source.get("sha256"), "dataset source hash")
+        source_path = _inside(workspace / source_name, workspace, "dataset source")
+        _match_hash(source_path, source_hash, "dataset source")
     return VerifiedExperiment(
         config_path, config, manifest_path, evaluation_path, manifest_hash, evaluation_hash
     )
@@ -84,9 +105,11 @@ def write_blocked_baseline(
     }
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     except OSError as exc:
-        raise ExperimentError(f"Failed to create baseline output directory: {exc}") from exc
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        raise ExperimentError(f"Failed to write baseline output: {exc}") from exc
     return payload
 
 
@@ -94,11 +117,16 @@ def score_evaluation(
     cases: list[dict[str, Any]], scores: dict[str, int | None], *, require_complete: bool = False
 ) -> dict[str, Any]:
     """Validate human scores and summarize a frozen evaluation suite."""
-    case_ids = {case.get("id") for case in cases}
-    if not all(isinstance(case_id, str) and case_id for case_id in case_ids):
-        raise ExperimentError("Every evaluation case must have a non-empty string ID.")
-    if len(case_ids) != len(cases):
-        raise ExperimentError("Evaluation case IDs must be unique.")
+    case_ids: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict):
+            raise ExperimentError("Every evaluation case must be an object.")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id:
+            raise ExperimentError("Every evaluation case must have a non-empty string ID.")
+        if case_id in case_ids:
+            raise ExperimentError("Evaluation case IDs must be unique.")
+        case_ids.add(case_id)
     unknown = sorted(set(scores) - case_ids)
     if unknown:
         raise ExperimentError(f"Scores contain unknown evaluation IDs: {', '.join(unknown)}")
@@ -158,16 +186,29 @@ def _inside(path: Path, workspace: Path, label: str) -> Path:
 
 
 def _require_hash(config: dict[str, Any], key: str) -> str:
-    value = config.get(key)
-    if not isinstance(value, str) or len(value) != 64:
-        raise ExperimentError(f"Missing or invalid frozen hash: {key}")
-    return value
+    try:
+        return _validate_hash(config.get(key), key)
+    except ExperimentError as exc:
+        raise ExperimentError(f"Missing or invalid frozen hash: {key}") from exc
+
+
+def _validate_hash(value: object, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value.casefold())
+    ):
+        raise ExperimentError(f"Invalid {label}.")
+    return value.casefold()
 
 
 def _match_hash(path: Path, expected: str, label: str) -> None:
     if not path.is_file():
         raise ExperimentError(f"Missing {label}: {path}")
-    observed = sha256_file(path)
+    try:
+        observed = sha256_file(path)
+    except OSError as exc:
+        raise ExperimentError(f"Could not hash {label}: {exc}") from exc
     if observed != expected:
         raise ExperimentError(
             f"{label.capitalize()} hash mismatch: expected {expected}, observed {observed}"

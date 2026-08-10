@@ -77,6 +77,7 @@ def test_command_returns_exit_code_and_bounded_output(tmp_path: Path) -> None:
 def test_patch_preview_and_backup(tmp_path: Path) -> None:
     target = tmp_path / "module.py"
     target.write_text("value = 1\n", encoding="utf-8")
+    target.chmod(0o755)
     tool = default_registry(tmp_path).get("apply_text_patch")
     arguments = {"path": "module.py", "old_text": "value = 1", "new_text": "value = 2"}
     preview = tool.preview(arguments)
@@ -89,6 +90,29 @@ def test_patch_preview_and_backup(tmp_path: Path) -> None:
     backups = list((tmp_path / ".hybrid-agent" / "backups").glob("*.bak"))
     assert len(backups) == 1
     assert backups[0].read_text(encoding="utf-8") == "value = 1\n"
+    assert target.stat().st_mode & 0o777 == 0o755
+    assert backups[0].stat().st_mode & 0o777 == 0o600
+    assert backups[0].parent.stat().st_mode & 0o777 == 0o700
+    assert backups[0].parent.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_patch_rejects_symlinked_backup_directory(tmp_path: Path) -> None:
+    target = tmp_path / "module.py"
+    target.write_text("value = 1\n", encoding="utf-8")
+    redirected = tmp_path / "redirected"
+    redirected.mkdir()
+    state = tmp_path / ".hybrid-agent"
+    state.mkdir()
+    (state / "backups").symlink_to(redirected, target_is_directory=True)
+    tool = default_registry(tmp_path).get("apply_text_patch")
+    arguments = {"path": "module.py", "old_text": "value = 1", "new_text": "value = 2"}
+    preview = tool.preview(arguments)
+    assert preview
+    digest = preview.splitlines()[0].partition("=")[2]
+
+    with pytest.raises(PermissionError, match="symbolic links"):
+        tool.handler({**arguments, "_approved_sha256": digest})
+    assert list(redirected.iterdir()) == []
 
 
 def test_patch_requires_one_exact_match(tmp_path: Path) -> None:

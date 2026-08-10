@@ -111,7 +111,7 @@ actions cannot be authorized by the model itself.
 
 ## Current verification state
 
-- 93 automated tests pass.
+- 125 automated tests pass.
 - Python source and tests compile.
 - The example SFT dataset validates with zero errors and warnings.
 - The example dataset prepares into deterministic, hash-verified splits.

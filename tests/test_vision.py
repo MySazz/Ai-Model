@@ -26,6 +26,13 @@ def test_non_image_is_rejected(tmp_path: Path) -> None:
         load_image(file, workspace=tmp_path)
 
 
+def test_zero_sized_image_is_rejected(tmp_path: Path) -> None:
+    image = tmp_path / "zero.png"
+    image.write_bytes(minimal_png(width=0, height=3))
+    with pytest.raises(ValueError, match="positive"):
+        load_image(image, workspace=tmp_path)
+
+
 def test_image_path_is_workspace_scoped(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

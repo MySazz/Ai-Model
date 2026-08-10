@@ -2,7 +2,11 @@ import json
 from pathlib import Path
 
 from hybrid_agent.evaluation import evaluate_responses
-from hybrid_agent.executable_evaluation import extract_python, run_python_checks
+from hybrid_agent.executable_evaluation import (
+    MAX_EXECUTION_OUTPUT_BYTES,
+    extract_python,
+    run_python_checks,
+)
 
 ROOT = Path(__file__).parents[1]
 SUITE = [
@@ -110,3 +114,12 @@ def test_submission_cannot_create_directory_outside_evaluation(tmp_path: Path):
     outcomes = run_python_checks(response, SUITE[0]["evaluator"])
     assert outcomes == {name: False for name in SUITE[0]["evaluator"]["checks"]}
     assert not marker.exists()
+
+
+def test_submission_output_is_bounded():
+    response = (
+        f"print('x' * {MAX_EXECUTION_OUTPUT_BYTES + 1})\n"
+        "def save_json_atomic(path, data): pass"
+    )
+    outcomes = run_python_checks(response, SUITE[0]["evaluator"])
+    assert outcomes == {name: False for name in SUITE[0]["evaluator"]["checks"]}

@@ -358,6 +358,7 @@ def prepare_dataset(
     seed: str = "hybrid-agent-v1",
     train_ratio: float = 0.8,
     validation_ratio: float = 0.1,
+    workspace: Path | None = None,
 ) -> dict[str, Any]:
     if not 0 < train_ratio < 1 or not 0 <= validation_ratio < 1:
         raise ValueError("Split ratios must be between zero and one.")
@@ -412,7 +413,7 @@ def prepare_dataset(
         },
         "input_files": [
             {
-                "path": _portable_path(path),
+                "path": _portable_path(path, workspace),
                 "sha256": _sha256_file(path),
             }
             for path in input_paths
@@ -657,11 +658,11 @@ def _record_split_group(record: dict[str, Any]) -> str | None:
     return group.strip() if isinstance(group, str) and group.strip() else None
 
 
-def _portable_path(path: Path) -> str:
+def _portable_path(path: Path, workspace: Path | None = None) -> str:
     resolved = path.resolve()
-    current = Path.cwd().resolve()
-    if resolved == current or current in resolved.parents:
-        return str(resolved.relative_to(current))
+    root = (workspace or Path.cwd()).resolve()
+    if resolved == root or root in resolved.parents:
+        return str(resolved.relative_to(root))
     return resolved.name
 
 

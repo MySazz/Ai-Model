@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ from typing import Any
 
 from .permissions import RiskLevel
 from .research import ResearchStore
+from .storage import protect_private_file
 
 ToolHandler = Callable[[dict[str, Any]], str]
 RiskAssessor = Callable[[dict[str, Any]], RiskLevel]
@@ -416,6 +418,7 @@ def default_registry(
         if path.stat().st_size > MAX_EDIT_CHARS:
             raise ValueError(f"Refusing to edit files larger than {MAX_EDIT_CHARS} bytes.")
         current = path.read_text(encoding="utf-8")
+        original_mode = stat.S_IMODE(path.stat().st_mode)
         digest = hashlib.sha256(current.encode("utf-8")).hexdigest()
         if digest != expected_digest:
             raise PermissionError("The target changed after approval; request a new approval.")
@@ -429,10 +432,26 @@ def default_registry(
         )
         if len(updated.encode("utf-8")) > MAX_EDIT_CHARS:
             raise ValueError(f"Patched file would exceed {MAX_EDIT_CHARS} bytes.")
-        backup = registry.resolve_path(f".hybrid-agent/backups/{digest}.bak")
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        if not backup.exists():
-            backup.write_text(current, encoding="utf-8")
+        state_directory = registry.workspace / ".hybrid-agent"
+        backup_directory = state_directory / "backups"
+        if state_directory.is_symlink() or backup_directory.is_symlink():
+            raise PermissionError("Patch backup directories cannot be symbolic links.")
+        backup_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not state_directory.is_dir() or not backup_directory.is_dir():
+            raise ValueError("Patch backup path is not a directory.")
+        if os.name == "posix":
+            state_directory.chmod(0o700)
+            backup_directory.chmod(0o700)
+        backup = backup_directory / f"{digest}.bak"
+        if backup.is_symlink():
+            raise PermissionError("Patch backup files cannot be symbolic links.")
+        try:
+            with backup.open("x", encoding="utf-8") as backup_stream:
+                backup_stream.write(current)
+        except FileExistsError:
+            if not backup.is_file() or backup.read_text(encoding="utf-8") != current:
+                raise RuntimeError("Existing patch backup does not match approved content.") from None
+        protect_private_file(backup)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{path.name}.",
             suffix=".tmp",
@@ -442,6 +461,8 @@ def default_registry(
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                 handle.write(updated)
                 handle.flush()
+                if os.name == "posix":
+                    os.fchmod(handle.fileno(), original_mode)
                 os.fsync(handle.fileno())
             os.replace(temporary_name, path)
         except Exception:

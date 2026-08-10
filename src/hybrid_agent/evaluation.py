@@ -51,8 +51,23 @@ def evaluate_responses(
     *, semantic_judge: Callable[[str, str], float] | None = None,
     executable_judge: Callable[[str, dict[str, Any]], dict[str, bool]] | None = None,
 ) -> dict[str, Any]:
+    case_ids: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict):
+            raise EvaluationError("Every evaluation case must be an object.")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id:
+            raise EvaluationError("Every case requires a non-empty string ID.")
+        if case_id in case_ids:
+            raise EvaluationError(f"Duplicate evaluation case ID: {case_id}")
+        if "critical_failure" in case and not isinstance(case["critical_failure"], bool):
+            raise EvaluationError(f"Case {case_id} critical_failure must be boolean.")
+        case_ids.add(case_id)
+
     indexed: dict[str, str] = {}
     for response in responses:
+        if not isinstance(response, dict):
+            raise EvaluationError("Every response must be an object.")
         case_id = response.get("id")
         text = response.get("response")
         if not isinstance(case_id, str) or not isinstance(text, str):
@@ -65,7 +80,6 @@ def evaluate_responses(
             raise EvaluationError(f"Duplicate response ID: {case_id}")
         indexed[case_id] = text
 
-    case_ids = {case.get("id") for case in cases}
     unknown = sorted(set(indexed) - case_ids)
     if unknown:
         raise EvaluationError("Responses contain unknown IDs: " + ", ".join(unknown))
@@ -73,7 +87,7 @@ def evaluate_responses(
     results = [
         _evaluate_case(
             case,
-            indexed.get(str(case.get("id")), ""),
+            indexed.get(case["id"], ""),
             semantic_judge=semantic_judge,
             executable_judge=executable_judge,
         )
