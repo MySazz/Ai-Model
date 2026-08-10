@@ -84,10 +84,25 @@ def test_dataset_validate_command(tmp_path: Path, capsys) -> None:
             "--workspace",
             str(tmp_path),
             "validate",
-            str(source),
+            "records.jsonl",
             "--json",
         ]
     ) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["valid"] is True
     assert report["records"] == 1
+
+    assert main(
+        [
+            "dataset",
+            "--workspace",
+            str(tmp_path),
+            "prepare",
+            "records.jsonl",
+            "--output",
+            "prepared",
+        ]
+    ) == 0
+    capsys.readouterr()
+    manifest = json.loads((tmp_path / "prepared" / "manifest.json").read_text())
+    assert manifest["input_files"][0]["path"] == "records.jsonl"

@@ -59,3 +59,13 @@ def test_legacy_database_is_migrated_without_recreating_table(tmp_path: Path) ->
         ).fetchall()
     assert "embedding_json" in columns
     assert versions == [(0,), (1,)]
+
+
+def test_empty_store_skips_embedding_request(tmp_path: Path, monkeypatch) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+
+    def unexpected_embedding(_text: str) -> list[float]:
+        raise AssertionError("empty memory should not request an embedding")
+
+    monkeypatch.setattr("hybrid_agent.memory._get_embedding", unexpected_embedding)
+    assert store.relevant("How should the CLI behave?") == []

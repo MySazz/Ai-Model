@@ -402,7 +402,7 @@ def run_dataset(args: argparse.Namespace) -> int:
     paths: list[Path] = []
     try:
         for path in args.paths:
-            resolved = path.resolve()
+            resolved = (path if path.is_absolute() else workspace / path).resolve()
             if resolved != workspace and workspace not in resolved.parents:
                 raise PermissionError(f"Dataset path escapes the workspace: {path}")
             paths.append(resolved)
@@ -429,7 +429,9 @@ def run_dataset(args: argparse.Namespace) -> int:
         return 0 if report.valid else 1
 
     try:
-        output = args.output.resolve()
+        output = (
+            args.output if args.output.is_absolute() else workspace / args.output
+        ).resolve()
         if output != workspace and workspace not in output.parents:
             raise PermissionError(f"Dataset output escapes the workspace: {args.output}")
         manifest = prepare_dataset(
@@ -438,6 +440,7 @@ def run_dataset(args: argparse.Namespace) -> int:
             seed=args.seed,
             train_ratio=args.train_ratio,
             validation_ratio=args.validation_ratio,
+            workspace=workspace,
         )
     except (OSError, UnicodeError, ValueError, PermissionError) as exc:
         print(f"Dataset preparation failed: {exc}", file=sys.stderr)

@@ -13,10 +13,14 @@ def digest(path: Path) -> str:
 
 def make_experiment(tmp_path: Path) -> Path:
     source = tmp_path / "source.jsonl"
-    split = tmp_path / "train.jsonl"
+    splits = {
+        name: tmp_path / f"{name}.jsonl"
+        for name in ("train", "validation", "test")
+    }
     evaluation = tmp_path / "evaluation.jsonl"
     source.write_text("source\n", encoding="utf-8")
-    split.write_text("training\n", encoding="utf-8")
+    for name, split in splits.items():
+        split.write_text(f"{name}\n", encoding="utf-8")
     evaluation.write_text('{"id":"case-1","prompt":"Test"}\n', encoding="utf-8")
     manifest = tmp_path / "manifest.json"
     manifest.write_text(
@@ -24,7 +28,9 @@ def make_experiment(tmp_path: Path) -> Path:
             {
                 "validation": {"valid": True},
                 "input_files": [{"path": "source.jsonl", "sha256": digest(source)}],
-                "output_sha256": {"train": digest(split)},
+                "output_sha256": {
+                    name: digest(split) for name, split in splits.items()
+                },
             }
         ),
         encoding="utf-8",
@@ -47,6 +53,19 @@ def make_experiment(tmp_path: Path) -> Path:
     return config
 
 
+def refresh_manifest_hash(config: Path, manifest: Path) -> None:
+    lines = config.read_text(encoding="utf-8").splitlines()
+    config.write_text(
+        "\n".join(
+            f'dataset_manifest_sha256 = "{digest(manifest)}"'
+            if line.startswith("dataset_manifest_sha256 = ")
+            else line
+            for line in lines
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_verify_experiment_checks_all_frozen_artifacts(tmp_path: Path) -> None:
     verified = verify_experiment(make_experiment(tmp_path), workspace=tmp_path)
     assert verified.config["experiment_id"] == "test"
@@ -63,6 +82,30 @@ def test_verify_experiment_refuses_changed_evaluation(tmp_path: Path) -> None:
     config = make_experiment(tmp_path)
     (tmp_path / "evaluation.jsonl").write_text("changed\n", encoding="utf-8")
     with pytest.raises(ExperimentError, match="Evaluation suite hash mismatch"):
+        verify_experiment(config, workspace=tmp_path)
+
+
+def test_verify_experiment_rejects_unsupported_manifest_split(tmp_path: Path) -> None:
+    config = make_experiment(tmp_path)
+    manifest = tmp_path / "manifest.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["output_sha256"] = {"../outside": "0" * 64}
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    refresh_manifest_hash(config, manifest)
+
+    with pytest.raises(ExperimentError, match="train, validation, and test"):
+        verify_experiment(config, workspace=tmp_path)
+
+
+def test_verify_experiment_reports_malformed_manifest(tmp_path: Path) -> None:
+    config = make_experiment(tmp_path)
+    manifest = tmp_path / "manifest.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["validation"] = True
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    refresh_manifest_hash(config, manifest)
+
+    with pytest.raises(ExperimentError, match="successful validation"):
         verify_experiment(config, workspace=tmp_path)
 
 

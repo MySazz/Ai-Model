@@ -15,6 +15,7 @@ from typing import Any
 from .evaluation import EvaluationError
 
 HARNESS_PATH = Path(__file__).with_name("executable_harness.py")
+MAX_EXECUTION_OUTPUT_BYTES = 1024 * 1024
 
 
 def extract_python(response: str) -> str:
@@ -32,7 +33,10 @@ def extract_python(response: str) -> str:
 def _limits() -> None:
     resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
     resource.setrlimit(resource.RLIMIT_AS, (768 * 1024 * 1024, 768 * 1024 * 1024))
-    resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024, 1024 * 1024))
+    resource.setrlimit(
+        resource.RLIMIT_FSIZE,
+        (MAX_EXECUTION_OUTPUT_BYTES, MAX_EXECUTION_OUTPUT_BYTES),
+    )
     resource.setrlimit(resource.RLIMIT_NPROC, (16, 16))
 
 
@@ -55,26 +59,31 @@ def run_python_checks(response: str, evaluator: dict[str, Any]) -> dict[str, boo
         return {name: False for name in checks}
     with tempfile.TemporaryDirectory(prefix="hybrid-exec-") as directory:
         submission = Path(directory) / "submission.py"
+        stdout_path = Path(directory) / "stdout.json"
+        stderr_path = Path(directory) / "stderr.txt"
         submission.write_text(code, encoding="utf-8")
         try:
-            completed = subprocess.run(  # noqa: S603 - fixed interpreter and harness argv
-                [sys.executable, "-I", str(HARNESS_PATH), harness, str(submission)],
-                cwd=directory,
-                env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"},
-                text=True,
-                capture_output=True,
-                timeout=30,
-                check=False,
-                preexec_fn=_limits if os.name == "posix" else None,
-            )
+            with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+                completed = subprocess.run(  # noqa: S603 - fixed interpreter and harness argv
+                    [sys.executable, "-I", str(HARNESS_PATH), harness, str(submission)],
+                    cwd=directory,
+                    env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"},
+                    stdout=stdout,
+                    stderr=stderr,
+                    timeout=30,
+                    check=False,
+                    preexec_fn=_limits if os.name == "posix" else None,
+                )
         except (subprocess.TimeoutExpired, OSError):
             return {name: False for name in checks}
-    if completed.returncode != 0:
-        return {name: False for name in checks}
-    try:
-        outcomes = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        return {name: False for name in checks}
+        if completed.returncode != 0:
+            return {name: False for name in checks}
+        try:
+            if stdout_path.stat().st_size > MAX_EXECUTION_OUTPUT_BYTES:
+                return {name: False for name in checks}
+            outcomes = json.loads(stdout_path.read_bytes())
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return {name: False for name in checks}
     if not isinstance(outcomes, dict):
         return {name: False for name in checks}
     return {name: outcomes.get(name) is True for name in checks}

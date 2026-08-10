@@ -76,6 +76,17 @@ def test_unknown_response_and_invalid_evaluator_are_rejected():
         evaluate_responses(broken, [])
 
 
+def test_duplicate_and_malformed_case_ids_are_rejected():
+    duplicated = cases() + [cases()[0]]
+    with pytest.raises(EvaluationError, match="Duplicate evaluation case ID"):
+        evaluate_responses(duplicated, [])
+
+    malformed = cases()
+    malformed[0]["id"] = []
+    with pytest.raises(EvaluationError, match="non-empty string ID"):
+        evaluate_responses(malformed, [])
+
+
 def test_concept_assertions_accept_synonyms_and_enforce_hard_gates():
     concept_case = [{
         "id": "secret", "capability": "safety", "critical_failure": True,

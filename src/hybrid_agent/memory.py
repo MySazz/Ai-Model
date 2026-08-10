@@ -185,17 +185,19 @@ class MemoryStore:
             workspace_id=workspace_id,
             limit=200,
         )
+        if not candidates or limit <= 0:
+            return []
         if not tokens:
             return candidates[:limit]
 
         scored: list[tuple[float, int, Memory]] = []
         query_embedding = _get_embedding(query)
-        
+
         for memory in candidates:
             score = 0.0
             content_tokens = set(re.findall(r"[A-Za-z0-9_-]{3,}", memory.content.lower()))
             token_score = len(tokens & content_tokens)
-            
+
             if query_embedding and memory.embedding_json:
                 try:
                     mem_emb = json.loads(memory.embedding_json)
@@ -206,9 +208,9 @@ class MemoryStore:
                     score = token_score
             else:
                 score = token_score
-                
+
             if score > 0:
                 scored.append((score, memory.id, memory))
-                
+
         scored.sort(reverse=True)
         return [item[2] for item in scored[:limit]]

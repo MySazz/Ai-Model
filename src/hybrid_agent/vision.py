@@ -24,6 +24,8 @@ def load_image(path: Path, *, workspace: Path) -> ImageInput:
         raise ValueError(f"Image exceeds the {MAX_IMAGE_BYTES}-byte limit.")
 
     media_type, width, height = _identify_image(data)
+    if width <= 0 or height <= 0:
+        raise ValueError("Image dimensions must be positive.")
     if width * height > MAX_IMAGE_PIXELS:
         raise ValueError(f"Image exceeds the {MAX_IMAGE_PIXELS}-pixel limit.")
     return ImageInput(
