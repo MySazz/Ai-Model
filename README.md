@@ -24,6 +24,9 @@ commands cannot be authorized by a model.
   group-held-out splitting, and frozen experiment hashes.
 - Policy, semantic, and executable evaluation. Failed adapters remain recorded
   as evidence and are not presented as successful models.
+- Failure-focused executable validators cover atomic commit cleanup,
+  cross-platform archive containment, migration rollback sequencing, and
+  immutable audit events; concise safety targets use deterministic concept gates.
 
 ## Install and validate
 
@@ -106,6 +109,17 @@ Verify a frozen experiment before spending GPU time:
 ```bash
 PYTHONPATH=src python3 -m hybrid_agent.cli experiment verify
 ```
+
+The current validator-backed teacher curriculum is reproducible with
+`scripts/build_validator_curriculum_v2.py`. Its 48 validated examples are split
+by eight held-out paraphrase families, so related variants cannot cross train,
+validation, and test partitions.
+
+The training-excluded `validator-holdout-v2` suite was frozen before model
+evaluation. It uses different streaming, batch-planning, deployment, and audit
+interfaces plus unseen safety scenarios. Its manifest pins the exact suite hash.
+The recorded no-retrieval 4B baseline passed 2/8 and is not registration-eligible;
+the frozen score and manual safety audit are preserved under `training/results/`.
 
 Registration requires no critical failures, at least 80% overall, at least 70%
 within every represented capability, improvement over the pinned base model,

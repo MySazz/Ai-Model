@@ -34,7 +34,10 @@ files = [
     "datasets/evaluations/automated-development-v2.jsonl",
     "datasets/evaluations/automated-holdout-v3.jsonl",
     "datasets/evaluations/executable-development-v1.jsonl",
+    "datasets/evaluations/validator-holdout-v2.jsonl",
+    "datasets/evaluations/validator-holdout-v2.manifest.json",
     "datasets/generation/execution-guided-tasks-v1.jsonl",
+    "datasets/generation/execution-guided-tasks-v2.jsonl",
     "datasets/processed/capability-v1/manifest.json",
     "datasets/processed/capability-v1/train.jsonl",
     "datasets/processed/capability-v1/validation.jsonl",
@@ -83,6 +86,15 @@ files = [
     "datasets/processed/executable-curriculum-v1/train.jsonl",
     "datasets/processed/executable-curriculum-v1/validation.jsonl",
     "datasets/processed/executable-curriculum-v1/test.jsonl",
+    "scripts/build_validator_curriculum_v2.py",
+    "scripts/build_validator_holdout_v2.py",
+    "datasets/candidates/validator-curriculum-v2.jsonl",
+    "datasets/processed/validator-curriculum-v2/manifest.json",
+    "datasets/processed/validator-curriculum-v2/train.jsonl",
+    "datasets/processed/validator-curriculum-v2/validation.jsonl",
+    "datasets/processed/validator-curriculum-v2/test.jsonl",
+    "training/colab/run_qwen3_8b_baseline_v1.py",
+    "training/colab/run_qwen3_4b_validator_holdout_v2.py",
 ]
 with ZipFile(output, "w", ZIP_DEFLATED) as archive:
     for name in files:

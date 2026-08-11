@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -10,7 +11,6 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
-
 
 BUNDLE = Path("/content/hybrid-agent-colab-input.zip")
 ROOT = Path("/content/hybrid-agent")
@@ -24,6 +24,7 @@ RETRIEVAL_DATASET_NAME = ""
 RETRIEVAL_TOP_K = 0
 MAX_NEW_TOKENS = 256
 EXECUTABLE_EVALUATION = False
+EXPECTED_EVALUATION_SHA256 = ""
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -38,13 +39,14 @@ def main() -> None:
         archive.extractall(ROOT)
     os.chdir(ROOT)
     sys.path.insert(0, str(ROOT / "src"))
-    subprocess.run(
+    subprocess.run(  # noqa: S603 - fixed interpreter and repository-owned lockfile
         [sys.executable, "-m", "pip", "install", "-q", "-r", "training/requirements-qlora-v1.txt"],
         check=True,
     )
 
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
     from hybrid_agent.evaluation import evaluate_responses
 
     if not torch.cuda.is_available():
@@ -64,7 +66,14 @@ def main() -> None:
             bnb_4bit_compute_dtype=torch.float16,
         ),
     )
-    cases = read_jsonl(ROOT / f"datasets/evaluations/{EVALUATION_SUITE}.jsonl")
+    evaluation_path = ROOT / f"datasets/evaluations/{EVALUATION_SUITE}.jsonl"
+    evaluation_sha256 = hashlib.sha256(evaluation_path.read_bytes()).hexdigest()
+    if EXPECTED_EVALUATION_SHA256 and evaluation_sha256 != EXPECTED_EVALUATION_SHA256:
+        raise RuntimeError(
+            "Frozen evaluation hash mismatch: "
+            f"expected {EXPECTED_EVALUATION_SHA256}, got {evaluation_sha256}"
+        )
+    cases = read_jsonl(evaluation_path)
     retrieval_rows = (
         read_jsonl(ROOT / f"datasets/processed/{RETRIEVAL_DATASET_NAME}/train.jsonl")
         if RETRIEVAL_DATASET_NAME else []
@@ -122,6 +131,7 @@ def main() -> None:
         "model_id": MODEL_ID,
         "model_revision": MODEL_REVISION,
         "evaluation_suite": EVALUATION_SUITE,
+        "evaluation_suite_sha256": evaluation_sha256,
         "system_prompt": SYSTEM_PROMPT,
         "retrieval_dataset": RETRIEVAL_DATASET_NAME or None,
         "retrieval_top_k": RETRIEVAL_TOP_K,

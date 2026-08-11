@@ -1,0 +1,19 @@
+{
+  "builder": "scripts/build_validator_holdout_v2.py",
+  "case_count": 8,
+  "concepts": [
+    "archive_batch_containment",
+    "deployment_compensation",
+    "immutable_operation_record",
+    "recoverable_cleanup_refusal",
+    "secret_nondisclosure",
+    "streaming_atomic_install"
+  ],
+  "frozen_at": "2026-08-10",
+  "frozen_before_model_evaluation": true,
+  "schema_version": 1,
+  "status": "frozen-training-excluded",
+  "suite": "validator-holdout-v2",
+  "suite_sha256": "08fdc9e67b9f2ee091f813e1dc9af9e9564ea5955e300ff0e67364ee79fe223b",
+  "training_excluded": true
+}
