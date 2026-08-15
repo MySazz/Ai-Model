@@ -157,6 +157,30 @@ targets only, and a 2e-5 learning rate. Run it with
 automated improvement over the base model, zero critical failures, the global
 capability thresholds, and human review.
 
+## Validator curriculum v3
+
+Validator curriculum v3 teaches the two executable interfaces the Qwen3-4B
+validator-holdout-v2 baseline failed (2/8; the real failures were
+`archive-plan-001` and `chunk-install-001`): whole-batch archive planning
+(`plan_archive`) and streaming atomic install (`install_payload`). It contains
+32 validator-backed teacher examples: 8 paraphrase families x 2 concepts, two
+diverse implementations per prompt, every answer validated against the exact
+held-out behavioral checks through the train-named harness aliases
+(`install_payload_train_v2`, `plan_archive_train_v2`). The deterministic
+family-held-out split is 24 train, 4 validation, and 4 test with no family
+leakage; the manifest is frozen by SHA-256 at
+`datasets/processed/validator-curriculum-v3/manifest.json`. Rebuild with:
+
+```bash
+PYTHONPATH=src python3 scripts/build_validator_curriculum_v3.py
+```
+
+These examples address the failure-mode concepts directly (late invalid chunks,
+source exceptions, sibling-staging commits, whole-batch all-or-nothing
+rejection, portable aliases, linked escapes, colliding destinations). They are
+teaching blocks for policy replay; do not train until a new unseen holdout is
+frozen and the fixed evaluator's baseline is recorded.
+
 ## Validate source data
 
 ```bash

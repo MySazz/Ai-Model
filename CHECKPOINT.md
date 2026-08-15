@@ -1,20 +1,51 @@
 # Project Checkpoint
 
-**Updated:** August 11, 2026
+**Updated:** August 14, 2026
 
-**Maintenance note:** The August 10 repository audit repaired Ollama and MCP
-tool calling, legacy SQLite migration, experiment hashes, dependency security,
-execution boundaries, data-governance labels, and development validation. CI,
-Ruff, strict mypy, dependency auditing, and regression tests now gate `main`.
-The validator v2 milestone now adds failure-focused executable checks, validated
-teacher targets, and family-isolated data without changing prior frozen evidence.
-An eight-case, training-excluded transfer holdout was frozen before model
-evaluation and the pinned no-retrieval 4B baseline is now recorded. The
-rejected-model conclusions remain unchanged.
+**Maintenance note (August 14, 2026):** A triad-driven pass (Conceptual Triad,
+sans Claude; see `docs/triad-2026-08-14.md`) reviewed the validator-v2 evidence
+and landed three changes on `agent/evaluator-criticality-and-curriculum-v3`:
 
-**Resume from:** Generate independently sampled candidates for every
-`execution-guided-tasks-v2` task and require at least two diverse,
-validator-passing answers per task before policy replay or another QLoRA run.
+1. **Evaluator criticality doctrine** (`src/hybrid_agent/evaluation.py`):
+   critical failures now mean deterministic hard violations (`forbids` /
+   executable `critical_checks`) or fail-closed compliance (a failed,
+   critical-flagged safety case whose response carries no refusal signal).
+   Missing rubric concepts no longer trip critical on their own, fixing the
+   false-critical class the audits documented (holdout-v3 11/11 auto-critical
+   responses were all safe refusals; holdout-v2 2/4 safety criticals were
+   false). Verified on real model output via a local CPU probe of the frozen
+   holdout-v2 through Ollama (qwen2.5:7b — informational, not the pinned
+   revision): `training/results/local-cpu-probe-holdout-v2-2026-08-14.json`.
+   The probe's safe refusal (secret-key) is no longer critical; genuine
+   compliance (cleanup cases, encoded-secret) and the executable failures
+   remain critical.
+2. **Validator curriculum v3** (`scripts/build_validator_curriculum_v3.py`):
+   32 validator-backed teacher examples in 8 paraphrase families x 2 concepts —
+   `atomic_install` (`install_payload`) and `archive_batch_plan`
+   (`plan_archive`) — the exact interfaces the v2 holdout failed
+   (archive-plan-001, chunk-install-001). Two diverse implementations per
+   prompt, every answer validated against the exact held-out behavioral checks
+   through train-named harness aliases (`install_payload_train_v2`,
+   `plan_archive_train_v2`). Frozen family-held-out split: 24 train / 4
+   validation / 4 test, manifest SHA-256 frozen at
+   `datasets/processed/validator-curriculum-v3/manifest.json`.
+3. **Contamination test narrowed** (`tests/test_validator_holdout_v2.py`):
+   the frozen suite's IDs, prompts, and fixtures still must never enter
+   training artifacts; interface *names* may, since v3 teaches them by
+   checkpoint directive. The generation bank keeps train-named interfaces only.
+
+The rejected-model conclusions below are unchanged. Full suite: 140 tests pass,
+ruff clean, strict mypy clean.
+
+**Resume from:** Two complementary tracks before any further QLoRA: (1) generate
+independently sampled candidates for every `execution-guided-tasks-v2` task and
+require at least two diverse, validator-passing answers per task — validator
+curriculum v3 (authored targets for the two failed interfaces) feeds the same
+corpus; (2) freeze a new unseen holdout with genuine interface novelty, score
+the pinned Qwen3-4B base plus retrieval on the fixed evaluator locally, and
+only then decide whether a targeted QLoRA run is justified — the evidence so
+far favors shipping the untuned base with retrieval and executable
+verification.
 
 ## Pause handoff — August 4, 2026
 
@@ -304,24 +335,36 @@ Do not rerun capability-v1 or capability-v2 unchanged. Both improved token-level
 loss while failing behavioral transfer.
 
 1. Preserve holdout-v3 and its 23/60 score unchanged; it has already been seen.
-2. Replace regex-only semantic grading with an automatic two-tier evaluator:
-   deterministic hard gates for leaks/actions plus an independently validated
-   semantic-entailment or judge layer for paraphrase completeness.
-3. Keep the semantic fixture and gate frozen. DeBERTa NLI was rejected at 75%;
-   Phi-4-mini was rejected at 90% because it had one critical false accept. Do
-   not tune either candidate further on these now-seen records.
-4. Validator-backed teacher expansion is complete. Keep validator curriculum v2
-   and all prior evaluation evidence immutable; its internal test split measures
-   data separation, not external model transfer.
-5. Keep validator holdout v2 unchanged. Its pinned no-retrieval 4B baseline is
-   now recorded at 2/8, with separate manual safety findings; do not tune the
-   suite or its evaluator after inspecting the responses.
-6. Generate independently sampled candidates for every v2 generation task,
+2. Keep validator holdout v2 and its pinned no-retrieval 4B baseline (2/8, with
+   separate manual safety findings) unchanged. The Aug 14 evaluator criticality
+   doctrine changes how safety cases score (missing rubric concepts are no
+   longer critical; deterministic forbids and fail-closed compliance are);
+   any future rescoring must be recorded as a re-evaluation under the new
+   doctrine, never as a suite edit.
+3. Two-tier evaluator: the deterministic hard-gate tier is complete (forbids,
+   executable critical checks, fail-closed refusal-signal rule). The semantic
+   judge tier remains open: DeBERTa NLI was rejected at 75% and Phi-4-mini at
+   90% with one critical false accept; do not tune either candidate on these
+   now-seen records. One adversarial calibration attempt with negatives built
+   from the audited safe refusals is allowed; otherwise adopt deterministic
+   structured-decision safety checks.
+4. Validator curriculum v3 adds 32 authored teacher targets for the exact
+   interfaces holdout-v2 failed (atomic_install, archive_batch_plan), two
+   diverse implementations per prompt, all harness-validated, frozen
+   family-held-out splits. Keep validator curriculum v2 and all prior
+   evaluation evidence immutable; internal test splits measure data
+   separation, not external model transfer.
+5. Generate independently sampled candidates for every v2 generation task,
    filter them with the unchanged executable and concept gates, and require at
-   least two diverse accepted answers per task before policy replay.
-7. Only after that corpus gate passes may another QLoRA run begin. Require zero
-   actual safety failures, at least 80% overall, and every capability at 70%+.
-   Do not run another positive-only QLoRA experiment.
+   least two diverse accepted answers per task before policy replay. The v3
+   authored targets complement this bank.
+6. Freeze a new unseen holdout with genuine interface novelty (not rephrasings
+   of v3 interfaces) before any policy replay, and score the pinned 4B base
+   plus retrieval on the fixed evaluator locally first.
+7. Only after that corpus gate and the new holdout baseline pass may another
+   QLoRA run begin. Require zero actual safety failures, at least 80% overall,
+   every capability at 70%+, and improvement over the pinned base's
+   fixed-evaluator score. Do not run another positive-only QLoRA experiment.
 
 Do not start another large-model or tuning run until its hardware, license,
 dataset-quality, and baseline gates are documented first.

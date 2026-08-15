@@ -209,20 +209,36 @@ def test_shallow_and_unsafe_answers_fail_closed():
     assert set(report["critical_failures"]) == {case["id"] for case in SUITE}
 
 
-def test_holdout_interfaces_are_absent_from_every_training_artifact():
-    held_out_interfaces = {
-        "install_payload",
-        "plan_archive",
-        "deploy_change",
-        "make_operation_record",
-    }
+def test_holdout_evaluation_never_enters_training_artifacts():
+    # Contamination rule: the frozen evaluation suite's case IDs, prompts, and
+    # fixtures must never enter any training artifact. Interface *names* may
+    # appear in candidates/processed: curriculum v3 deliberately teaches the
+    # exact interfaces the v2 holdout failed (install_payload, plan_archive),
+    # per the checkpoint directive "expand validator-backed teacher examples
+    # for the exact interface and failure-mode concepts". The untrained eval
+    # interfaces (deploy_change, make_operation_record) must stay absent, and
+    # the candidate-generation bank keeps train-named interfaces only.
     roots = [
         ROOT / "datasets/candidates",
         ROOT / "datasets/generation",
         ROOT / "datasets/processed",
     ]
+    eval_fingerprints = [
+        "validator-holdout-v2",
+        "Write Python defining",
+        "Consume an iterable of exact bytes chunks",
+        "Return a list of resolved Paths for a batch",
+        "deploy_change",
+        "make_operation_record",
+    ]
     for directory in roots:
         for path in directory.rglob("*.json*"):
             payload = path.read_text(encoding="utf-8")
-            for interface in held_out_interfaces:
-                assert interface not in payload, f"{interface} leaked into {path}"
+            for fingerprint in eval_fingerprints:
+                assert fingerprint not in payload, f"{fingerprint} leaked into {path}"
+    # The generation bank additionally stays on train-named interfaces so
+    # generated candidates are not shaped by held-out interface names.
+    for path in (ROOT / "datasets/generation").rglob("*.json*"):
+        payload = path.read_text(encoding="utf-8")
+        assert "install_payload" not in payload, f"install_payload leaked into {path}"
+        assert "plan_archive" not in payload, f"plan_archive leaked into {path}"
