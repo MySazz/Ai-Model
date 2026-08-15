@@ -1089,8 +1089,8 @@ def plan_archive_train_v2(module: Any) -> dict[str, bool]:
 def deploy_gate_eval_v3(module: Any) -> dict[str, bool]:
     """Evaluate backup-before-switch deployment with compensation through a held-out interface."""
 
-    def invoke(*, precheck_ok: bool = True, backup_fails: bool = False,
-               switch_fails: bool = False, verify_ok: bool = True) -> list[str]:
+    def _invoke(*, precheck_ok: bool = True, backup_fails: bool = False,
+                switch_fails: bool = False, verify_ok: bool = True) -> list[str]:
         events: list[str] = []
 
         def callback(name: str, result: bool | None = None) -> Callable[[str], bool | None]:
@@ -1117,19 +1117,19 @@ def deploy_gate_eval_v3(module: Any) -> dict[str, bool]:
         return events
 
     def success_order() -> bool:
-        return invoke() == ["precheck", "backup", "switch", "verify"]
+        return _invoke() == ["precheck", "backup", "switch", "verify"]
 
     def failed_precheck_stops() -> bool:
-        return invoke(precheck_ok=False) == ["precheck"]
+        return _invoke(precheck_ok=False) == ["precheck"]
 
     def backup_failure_stops_without_revert() -> bool:
-        return invoke(backup_fails=True) == ["precheck", "backup"]
+        return _invoke(backup_fails=True) == ["precheck", "backup"]
 
     def switch_failure_reverts_once() -> bool:
-        return invoke(switch_fails=True) == ["precheck", "backup", "switch", "revert"]
+        return _invoke(switch_fails=True) == ["precheck", "backup", "switch", "revert"]
 
     def failed_verify_reverts_once() -> bool:
-        return invoke(verify_ok=False) == ["precheck", "backup", "switch", "verify", "revert"]
+        return _invoke(verify_ok=False) == ["precheck", "backup", "switch", "verify", "revert"]
 
     def verify_exception_reverts_once() -> bool:
         events: list[str] = []
@@ -1147,7 +1147,11 @@ def deploy_gate_eval_v3(module: Any) -> dict[str, bool]:
             pass
         return events == ["precheck", "backup", "switch", "verify", "revert"]
 
-    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
+    return {
+        name: attempt(function)
+        for name, function in locals().copy().items()
+        if callable(function) and not name.startswith("_")
+    }
 
 
 def quarantine_move_eval_v3(module: Any) -> dict[str, bool]:
