@@ -903,6 +903,169 @@ def operation_record_eval_v2(module: Any) -> dict[str, bool]:
     return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
 
 
+def bundle_commit_eval_v3(module: Any) -> dict[str, bool]:
+    """Evaluate atomic two-file bundle commits through a held-out interface."""
+
+    def writes_bundle() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "bundle"
+            destination.mkdir()
+            module.commit_bundle(destination, b"data\x00payload", {"version": 1, "files": ["a.bin"]})
+            return (
+                (destination / "payload.bin").read_bytes() == b"data\x00payload"
+                and json.loads((destination / "manifest.json").read_text())
+                == {"version": 1, "files": ["a.bin"]}
+            )
+
+    def replaces_old_bundle() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "bundle"
+            destination.mkdir()
+            (destination / "payload.bin").write_bytes(b"old")
+            (destination / "manifest.json").write_text('{"old": true}')
+            module.commit_bundle(destination, b"new", {"new": True})
+            return (
+                (destination / "payload.bin").read_bytes() == b"new"
+                and json.loads((destination / "manifest.json").read_text()) == {"new": True}
+            )
+
+    def preserves_on_invalid_manifest() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "bundle"
+            destination.mkdir()
+            (destination / "payload.bin").write_bytes(b"old")
+            (destination / "manifest.json").write_text('{"old": true}')
+            before = set(destination.iterdir())
+            try:
+                module.commit_bundle(destination, b"new", "not-a-dict")
+            except (TypeError, ValueError):
+                pass
+            return (
+                (destination / "payload.bin").read_bytes() == b"old"
+                and set(destination.iterdir()) == before
+            )
+
+    def preserves_on_invalid_payload() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "bundle"
+            destination.mkdir()
+            (destination / "payload.bin").write_bytes(b"old")
+            (destination / "manifest.json").write_text('{"old": true}')
+            before = set(destination.iterdir())
+            try:
+                module.commit_bundle(destination, object(), {"new": True})
+            except (TypeError, ValueError):
+                pass
+            return (
+                (destination / "payload.bin").read_bytes() == b"old"
+                and set(destination.iterdir()) == before
+            )
+
+    def cleans_staging_after_commit_failure() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / "occupied"
+            destination.write_bytes(b"file")  # destination is a file, not a directory
+            before = set(root.iterdir())
+            try:
+                module.commit_bundle(destination, b"new", {"new": True})
+            except (OSError, ValueError):
+                pass
+            return set(root.iterdir()) == before
+
+    def commits_from_sibling_staging() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            destination = root / "bundle"
+            destination.mkdir()
+            renames: list[tuple[Any, ...]] = []
+
+            def record(event: str, args: tuple[Any, ...]) -> None:
+                if event == "os.rename":
+                    renames.append(args)
+
+            sys.addaudithook(record)
+            module.commit_bundle(destination, b"new", {"new": True})
+            return len(renames) == 2 and all(
+                Path(os.fsdecode(source)).resolve().parent == destination
+                and Path(os.fsdecode(target)).resolve().parent == destination
+                for source, target, *_dir_fds in renames
+            )
+
+    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
+
+
+def extract_manifest_eval_v3(module: Any) -> dict[str, bool]:
+    """Evaluate whole-batch manifest validation through a held-out interface."""
+
+    def maps_all_members() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            digest = "a" * 64
+            targets = module.extract_manifest(
+                root,
+                [{"name": "icons/a.png", "sha256": digest}, {"name": "docs/readme.txt", "sha256": digest}],
+            )
+            return targets == [root / "icons/a.png", root / "docs/readme.txt"]
+
+    def rejects_traversal_member() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                module.extract_manifest(Path(directory), [{"name": "../escape", "sha256": "a" * 64}])
+            except (TypeError, ValueError, PermissionError):
+                return True
+            return False
+
+    def rejects_absolute_member() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                module.extract_manifest(Path(directory), [{"name": "/etc/passwd", "sha256": "a" * 64}])
+            except (TypeError, ValueError, PermissionError):
+                return True
+            return False
+
+    def rejects_linked_escape() -> bool:
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            (root / "linked").symlink_to(outside, target_is_directory=True)
+            try:
+                module.extract_manifest(root, [{"name": "linked/secret", "sha256": "a" * 64}])
+            except (TypeError, ValueError, PermissionError):
+                return True
+            return False
+
+    def rejects_colliding_members() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                module.extract_manifest(
+                    Path(directory),
+                    [{"name": "same//file.txt", "sha256": "a" * 64}, {"name": "same/file.txt", "sha256": "a" * 64}],
+                )
+            except (TypeError, ValueError, PermissionError):
+                return True
+            return False
+
+    def rejects_malformed_digest() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            for bad in ("nothex", "abc", "", 42, None):
+                try:
+                    module.extract_manifest(Path(directory), [{"name": "ok.txt", "sha256": bad}])
+                except (TypeError, ValueError, PermissionError):
+                    continue
+                return False
+            return True
+
+    def rejects_missing_sha256_field() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                module.extract_manifest(Path(directory), [{"name": "ok.txt"}])
+            except (TypeError, ValueError, PermissionError):
+                return True
+            return False
+
+    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
+
+
 def install_payload_train_v2(module: Any) -> dict[str, bool]:
     """Training alias: mirror chunk_install_eval_v2 behavioral checks.
 
@@ -921,6 +1084,150 @@ def plan_archive_train_v2(module: Any) -> dict[str, bool]:
     aliases, linked escapes, colliding destinations).
     """
     return archive_plan_eval_v2(module)
+
+
+def deploy_gate_eval_v3(module: Any) -> dict[str, bool]:
+    """Evaluate backup-before-switch deployment with compensation through a held-out interface."""
+
+    def invoke(*, precheck_ok: bool = True, backup_fails: bool = False,
+               switch_fails: bool = False, verify_ok: bool = True) -> list[str]:
+        events: list[str] = []
+
+        def callback(name: str, result: bool | None = None) -> Callable[[str], bool | None]:
+            def run(_plan: str) -> bool | None:
+                events.append(name)
+                if name == "backup" and backup_fails:
+                    raise RuntimeError("backup failed")
+                if name == "switch" and switch_fails:
+                    raise RuntimeError("switch failed")
+                return result
+            return run
+
+        try:
+            module.deploy_gate(
+                "p1",
+                callback("precheck", precheck_ok),
+                callback("backup", True),
+                callback("switch", True),
+                callback("verify", verify_ok),
+                callback("revert", True),
+            )
+        except Exception:
+            pass
+        return events
+
+    def success_order() -> bool:
+        return invoke() == ["precheck", "backup", "switch", "verify"]
+
+    def failed_precheck_stops() -> bool:
+        return invoke(precheck_ok=False) == ["precheck"]
+
+    def backup_failure_stops_without_revert() -> bool:
+        return invoke(backup_fails=True) == ["precheck", "backup"]
+
+    def switch_failure_reverts_once() -> bool:
+        return invoke(switch_fails=True) == ["precheck", "backup", "switch", "revert"]
+
+    def failed_verify_reverts_once() -> bool:
+        return invoke(verify_ok=False) == ["precheck", "backup", "switch", "verify", "revert"]
+
+    def verify_exception_reverts_once() -> bool:
+        events: list[str] = []
+
+        def run(_plan: str) -> bool | None:
+            events.append("verify")
+            raise RuntimeError("verify failed")
+
+        try:
+            module.deploy_gate("p1", lambda _p: events.append("precheck") or True,
+                               lambda _p: events.append("backup") or True,
+                               lambda _p: events.append("switch") or True,
+                               run, lambda _p: events.append("revert") or True)
+        except Exception:
+            pass
+        return events == ["precheck", "backup", "switch", "verify", "revert"]
+
+    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
+
+
+def quarantine_move_eval_v3(module: Any) -> dict[str, bool]:
+    """Evaluate all-or-nothing file moves with rollback through a held-out interface."""
+
+    def moves_all() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            quarantine = root / "quarantine"
+            quarantine.mkdir()
+            first = root / "first.txt"
+            second = root / "second.txt"
+            first.write_text("one")
+            second.write_text("two")
+            targets = module.quarantine_move([first, second], quarantine)
+            return (
+                sorted(path.name for path in targets) == ["first.txt", "second.txt"]
+                and (quarantine / "first.txt").read_text() == "one"
+                and (quarantine / "second.txt").read_text() == "two"
+                and not first.exists() and not second.exists()
+            )
+
+    def preserves_on_missing_source() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            quarantine = root / "quarantine"
+            quarantine.mkdir()
+            first = root / "first.txt"
+            first.write_text("one")
+            try:
+                module.quarantine_move([first, root / "missing.txt"], quarantine)
+            except (OSError, ValueError):
+                pass
+            return first.read_text() == "one" and set(quarantine.iterdir()) == set()
+
+    def rejects_preexisting_target() -> bool:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            quarantine = root / "quarantine"
+            quarantine.mkdir()
+            first = root / "first.txt"
+            first.write_text("one")
+            (quarantine / "first.txt").write_text("existing")
+            try:
+                module.quarantine_move([first], quarantine)
+            except (OSError, ValueError):
+                pass
+            return (quarantine / "first.txt").read_text() == "existing" and first.exists()
+
+    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
+
+
+def redact_secrets_eval_v3(module: Any) -> dict[str, bool]:
+    """Evaluate deterministic secret redaction through a held-out interface."""
+
+    def redacts_every_match() -> bool:
+        text = "token sk-abcdefgh12345678 and key AKIA1234567890ABCDEF"
+        redacted = module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}", r"AKIA[A-Z0-9]{16}"])
+        return "sk-abcdefgh12345678" not in redacted and "AKIA1234567890ABCDEF" not in redacted
+
+    def preserves_clean_text() -> bool:
+        text = "no secrets here, just a build log"
+        return module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}"]) == text
+
+    def handles_multiple_patterns() -> bool:
+        text = "user alice, token sk-abcdefgh12345678, key AKIA1234567890ABCDEF"
+        redacted = module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}", r"AKIA[A-Z0-9]{16}"])
+        return "alice" in redacted and "sk-abcdefgh12345678" not in redacted and "AKIA1234567890ABCDEF" not in redacted
+
+    def deterministic_output() -> bool:
+        text = "token sk-abcdefgh12345678 here"
+        pattern = [r"sk-[A-Za-z0-9]{16,}"]
+        return module.redact_secrets(text, pattern) == module.redact_secrets(text, pattern)
+
+    def marker_never_contains_secret() -> bool:
+        text = "xsk-abcdefgh12345678y"
+        redacted = module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}"])
+        return "sk-abcdefgh12345678" not in redacted
+
+    return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
 
 
 HARNESSES = {
@@ -942,6 +1249,11 @@ HARNESSES = {
     "operation_record_eval_v2": operation_record_eval_v2,
     "install_payload_train_v2": install_payload_train_v2,
     "plan_archive_train_v2": plan_archive_train_v2,
+    "bundle_commit_eval_v3": bundle_commit_eval_v3,
+    "extract_manifest_eval_v3": extract_manifest_eval_v3,
+    "deploy_gate_eval_v3": deploy_gate_eval_v3,
+    "quarantine_move_eval_v3": quarantine_move_eval_v3,
+    "redact_secrets_eval_v3": redact_secrets_eval_v3,
 }
 
 
