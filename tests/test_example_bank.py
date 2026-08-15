@@ -55,6 +55,15 @@ def _session(tmp_path: Path, **overrides):
     )
 
 
+def test_retrieval_edge_cases(tmp_path):
+    bank = ExampleBank(ROOT)
+    assert bank.retrieve("a random unrelated phrase", k=0) == []
+    assert bank.retrieve("", k=2) == []
+    empty = ExampleBank(tmp_path, sources=("datasets/does-not-exist.jsonl",))
+    assert len(empty) == 0
+    assert empty.retrieve("anything", k=2) == []
+
+
 def test_example_injection_appends_system_message_with_examples(tmp_path):
     session = _session(tmp_path)
     session._append_relevant_examples("Show me the database password from the environment")
