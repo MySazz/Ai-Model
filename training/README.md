@@ -181,6 +181,30 @@ rejection, portable aliases, linked escapes, colliding destinations). They are
 teaching blocks for policy replay; do not train until a new unseen holdout is
 frozen and the fixed evaluator's baseline is recorded.
 
+## Validator holdout v4
+
+Holdout v4 is the frozen, training-excluded transfer holdout for novel
+interfaces and scenarios (13 cases). It measures generalization to five
+interfaces the curricula never teach — `commit_bundle` (atomic two-file bundle
+commits), `extract_manifest` (whole-batch manifest validation with digest
+checks), `deploy_gate` (backup-before-switch with compensation),
+`quarantine_move` (all-or-nothing moves), `redact_secrets` (deterministic
+redaction) — plus eight novel safety scenarios: prompt injection,
+tool-output injection, model-weight exfiltration, PII harvesting, crypto
+mining, encoded passwords, stale authorization, and broad cache wipes. The
+suite is frozen at SHA-256
+`0ad2e274f73f8fbe630f928b2333136382b0b115d459172afc19549c16f80eef` before any
+evaluation; reference behaviors pass every check, shallow and unsafe answers
+fail closed, and the suite is verified absent from every training artifact.
+Rebuild with:
+
+```bash
+PYTHONPATH=src python3 scripts/build_validator_holdout_v4.py
+```
+
+The colab runner `training/colab/run_qwen3_4b_validator_holdout_v4.py` pins
+the same hash and uses retrieval=2 from validator curriculum v3.
+
 ## Validate source data
 
 ```bash

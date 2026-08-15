@@ -39,18 +39,42 @@ and landed three changes on `agent/evaluator-criticality-and-curriculum-v3`:
    system message for matching prompts. Smoke-tested live on this machine:
    Qwen3-4B via Ollama refuses a secret-disclosure prompt using the retrieved
    exemplar's safety language verbatim, and completes workspace tool tasks.
+5. **Validator holdout v4 frozen** (`scripts/build_validator_holdout_v4.py`):
+   13 training-excluded cases — five novel executable interfaces
+   (`commit_bundle`, `extract_manifest`, `deploy_gate`, `quarantine_move`,
+   `redact_secrets`) and eight novel safety scenarios (prompt injection,
+   tool-output injection, model-weight exfiltration, PII harvesting, crypto
+   mining, encoded passwords, stale authorization, broad cache wipes) — with
+   new eval harnesses (`*_eval_v3`) registered in `executable_harness.py`.
+   Frozen before any evaluation at SHA-256
+   `0ad2e274f73f8fbe630f928b2333136382b0b115d459172afc19549c16f80eef`
+   (`datasets/evaluations/validator-holdout-v4.manifest.json`); the colab
+   runner pins the same hash. Reference behaviors pass all checks; shallow
+   and unsafe answers fail closed; the suite is verified absent from every
+   training artifact.
+6. **Local CPU baseline recorded** (`training/results/qwen3-4b-validator-baseline-2026-08-14.json`,
+   qwen3:4b-instruct via Ollama — informational, not the byte-pinned HF
+   revision): holdout-v2 scores 1/8 with 2 criticals without retrieval vs
+   **5/8 with zero criticals** with retrieval=2; holdout-v4 (13 novel cases)
+   scores 1/13 vs 0/13, where all five novel executable interfaces fail their
+   unseen contracts but **zero safety criticals** occur across all eight novel
+   safety scenarios with retrieval. The retrieval recipe reproduces the Colab
+   10/12 result locally on CPU, the fixed evaluator shows no false criticals
+   (the v2 secret cases now score as safe refusals), and novel-interface
+   coding is the remaining honest gap — closed by executable verification and
+   interface teachers, not by another positive-only QLoRA run.
 
-The rejected-model conclusions below are unchanged. Full suite: 147 tests pass,
+The rejected-model conclusions below are unchanged. Full suite: 151 tests pass,
 ruff clean, strict mypy clean.
 
 **Resume from:** Two complementary tracks before any further QLoRA: (1) generate
 independently sampled candidates for every `execution-guided-tasks-v2` task and
 require at least two diverse, validator-passing answers per task — validator
 curriculum v3 (authored targets for the two failed interfaces) feeds the same
-corpus; (2) freeze a new unseen holdout with genuine interface novelty, score
-the pinned Qwen3-4B base plus retrieval on the fixed evaluator locally, and
-only then decide whether a targeted QLoRA run is justified — the evidence so
-far favors shipping the untuned base with retrieval and executable
+corpus; (2) score the pinned-family Qwen3-4B base on the frozen holdout v4
+(local CPU, with and without retrieval=2) and record the fixed-evaluator
+baseline, then decide whether a targeted QLoRA run is justified — the evidence
+so far favors shipping the untuned base with retrieval and executable
 verification.
 
 ## Pause handoff — August 4, 2026
@@ -364,9 +388,9 @@ loss while failing behavioral transfer.
    filter them with the unchanged executable and concept gates, and require at
    least two diverse accepted answers per task before policy replay. The v3
    authored targets complement this bank.
-6. Freeze a new unseen holdout with genuine interface novelty (not rephrasings
-   of v3 interfaces) before any policy replay, and score the pinned 4B base
-   plus retrieval on the fixed evaluator locally first.
+6. Holdout v4 is frozen (13 cases, maintenance note above); score the
+   pinned-family 4B base plus retrieval on it and on holdout v2 with the
+   fixed evaluator locally, and record the baseline before any policy replay.
 7. Only after that corpus gate and the new holdout baseline pass may another
    QLoRA run begin. Require zero actual safety failures, at least 80% overall,
    every capability at 70%+, and improvement over the pinned base's

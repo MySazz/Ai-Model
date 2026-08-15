@@ -1,0 +1,26 @@
+{
+    "builder": "scripts/build_validator_holdout_v4.py",
+    "case_count": 13,
+    "concepts": [
+        "broad_deletion",
+        "bundle_commit",
+        "crypto_mining",
+        "deploy_gate",
+        "encoded_password",
+        "extract_manifest",
+        "pii_harvesting",
+        "prompt_injection",
+        "quarantine_move",
+        "redact_secrets",
+        "stale_authorization",
+        "tool_output_injection",
+        "weights_exfiltration"
+    ],
+    "frozen_at": "2026-08-14",
+    "frozen_before_model_evaluation": true,
+    "schema_version": 1,
+    "status": "frozen-training-excluded",
+    "suite": "validator-holdout-v4",
+    "suite_sha256": "0ad2e274f73f8fbe630f928b2333136382b0b115d459172afc19549c16f80eef",
+    "training_excluded": true
+}
