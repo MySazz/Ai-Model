@@ -1,0 +1,36 @@
+{
+  "counts": {
+    "test": 4,
+    "train": 24,
+    "validation": 4
+  },
+  "input_files": [
+    {
+      "path": "datasets/candidates/validator-curriculum-v3.jsonl",
+      "sha256": "e07a9ed38544b782c5218c31879fe680d6d446aa8f39b3e9465cf45716b03d53"
+    }
+  ],
+  "output_sha256": {
+    "test": "dc966c1a056eb4733096cd9a165d7a3fd23f40a3cd90ab5a64cc76d7c682bf91",
+    "train": "e948abbf64a1b6af37bd1ceb12a0753c4ce587171f3518c7f46920dc845498d8",
+    "validation": "9c3a2016d0844720504ea6fe4b02d3e719a60441b1b2f41d8074e2c731fa4224"
+  },
+  "ratios": {
+    "test": 0.125,
+    "train": 0.75,
+    "validation": 0.125
+  },
+  "schema_version": 1,
+  "seed": "validator-v3-1",
+  "split_strategy": {
+    "metadata_field": "split_group",
+    "type": "metadata_group"
+  },
+  "validation": {
+    "errors": 0,
+    "issues": [],
+    "records": 32,
+    "valid": true,
+    "warnings": 0
+  }
+}

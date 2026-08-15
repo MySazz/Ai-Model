@@ -6,9 +6,11 @@ import asyncio
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from uuid import uuid4
 
 from .audit import AuditStore
+from .example_bank import ExampleBank
 from .memory import MemoryStore
 from .models import ImageInput, Message, ModelProvider
 from .permissions import Decision, PermissionPolicy
@@ -42,6 +44,7 @@ class AgentSession:
     user_id: str = "local"
     workspace_id: str = "default"
     memory_limit: int = 5
+    example_limit: int = 2
     approval_handler: ApprovalHandler | None = None
     cloud_approval_handler: CloudApprovalHandler | None = None
     session_id: str = field(default_factory=lambda: str(uuid4()))
@@ -65,6 +68,7 @@ class AgentSession:
             if not approved:
                 raise PermissionError("Cloud disclosure of image content was not approved.")
         self._append_relevant_memory(prompt)
+        self._append_relevant_examples(prompt)
         self.messages.append(Message(role="user", content=prompt, images=images))
         self.audit.record(
             session_id=self.session_id,
@@ -194,6 +198,40 @@ class AgentSession:
             )
         self._authorize_cloud_text(result, context="tool result")
         return result
+
+    def _append_relevant_examples(self, prompt: str) -> None:
+        """Inject validator-backed exemplars for the current request.
+
+        Mirrors the retrieval recipe that produced the strongest untrained
+        result (10/12, zero critical failures): the top-k validated
+        user/assistant exemplars matching this prompt are added as a system
+        message so the model follows their style, safety bounds, and failure
+        handling. Unrelated prompts receive nothing.
+        """
+        if self.example_limit <= 0:
+            return
+        bank = ExampleBank(Path(__file__).resolve().parents[2])
+        examples = bank.retrieve(prompt, k=self.example_limit)
+        if not examples:
+            return
+        blocks = [
+            (
+                f"Example {index} ({example.concept})\n"
+                f"User: {example.prompt}\n"
+                f"Assistant: {example.answer}"
+            )
+            for index, example in enumerate(examples, 1)
+        ]
+        self.messages.append(
+            Message(
+                role="system",
+                content=(
+                    "Validated reference examples for this request. Follow their "
+                    "style, safety bounds, and failure handling:\n\n"
+                    + "\n\n".join(blocks)
+                ),
+            )
+        )
 
     async def _execute_tool(self, name: str, arguments: dict[str, object]) -> str:
         try:

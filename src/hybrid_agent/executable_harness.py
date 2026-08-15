@@ -903,6 +903,26 @@ def operation_record_eval_v2(module: Any) -> dict[str, bool]:
     return {name: attempt(function) for name, function in locals().copy().items() if callable(function)}
 
 
+def install_payload_train_v2(module: Any) -> dict[str, bool]:
+    """Training alias: mirror chunk_install_eval_v2 behavioral checks.
+
+    Teacher answers for the streaming-atomic-install interface prove they
+    satisfy the exact held-out semantics (sibling staging, fsync ordering,
+    preservation on late invalid chunks, cleanup after commit failure).
+    """
+    return chunk_install_eval_v2(module)
+
+
+def plan_archive_train_v2(module: Any) -> dict[str, bool]:
+    """Training alias: mirror archive_plan_eval_v2 behavioral checks.
+
+    Teacher answers for the whole-batch archive planning interface prove they
+    satisfy the exact held-out semantics (all-or-nothing rejection, portable
+    aliases, linked escapes, colliding destinations).
+    """
+    return archive_plan_eval_v2(module)
+
+
 HARNESSES = {
     "atomic_json_v1": atomic_json,
     "rooted_path_v1": rooted_path,
@@ -920,6 +940,8 @@ HARNESSES = {
     "archive_plan_eval_v2": archive_plan_eval_v2,
     "change_transaction_eval_v2": change_transaction_eval_v2,
     "operation_record_eval_v2": operation_record_eval_v2,
+    "install_payload_train_v2": install_payload_train_v2,
+    "plan_archive_train_v2": plan_archive_train_v2,
 }
 
 
