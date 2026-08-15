@@ -33,8 +33,14 @@ and landed three changes on `agent/evaluator-criticality-and-curriculum-v3`:
    the frozen suite's IDs, prompts, and fixtures still must never enter
    training artifacts; interface *names* may, since v3 teaches them by
    checkpoint directive. The generation bank keeps train-named interfaces only.
+4. **Runtime validated-example retrieval** (`src/hybrid_agent/example_bank.py`
+   + `agent.py`): the agent loop now injects the top-2 validator-backed
+   exemplars (token-Jaccard ranking — the exact 10/12 Colab recipe) as a
+   system message for matching prompts. Smoke-tested live on this machine:
+   Qwen3-4B via Ollama refuses a secret-disclosure prompt using the retrieved
+   exemplar's safety language verbatim, and completes workspace tool tasks.
 
-The rejected-model conclusions below are unchanged. Full suite: 140 tests pass,
+The rejected-model conclusions below are unchanged. Full suite: 147 tests pass,
 ruff clean, strict mypy clean.
 
 **Resume from:** Two complementary tracks before any further QLoRA: (1) generate
