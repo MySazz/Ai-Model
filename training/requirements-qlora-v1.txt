@@ -2,7 +2,7 @@
 # Install a CUDA-compatible PyTorch wheel separately before this file.
 accelerate==1.8.1
 bitsandbytes==0.46.1
-datasets==3.6.0
+datasets==5.0.1
 peft==0.16.0
 safetensors==0.5.3
 # 5.10.0 clears CVE-2026-9856 (flagged by pip-audit against 5.5.0).
