@@ -5,7 +5,7 @@ bitsandbytes==0.46.1
 datasets==3.6.0
 peft==0.16.0
 safetensors==0.5.3
-# 5.5.0 is the first release that clears every advisory known to pip-audit at
-# the 2026-08-10 security review. Revalidate PEFT/TRL APIs before a GPU run.
-transformers==5.5.0
+# 5.10.0 clears CVE-2026-9856 (flagged by pip-audit against 5.5.0).
+# Revalidate PEFT/TRL APIs before a GPU run.
+transformers==5.10.0
 trl==0.19.1
