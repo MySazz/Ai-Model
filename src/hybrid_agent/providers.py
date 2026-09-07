@@ -73,6 +73,7 @@ class OllamaProvider:
         )
         try:
             def fetch() -> Any:
+                # nosemgrep: dynamic-urllib-use-detected - Ollama endpoint validated to http(s)+host in constructor
                 with urlopen(request, timeout=self.timeout) as response:  # noqa: S310
                     raw = response.read(MAX_RESPONSE_BYTES + 1)
                     if len(raw) > MAX_RESPONSE_BYTES:

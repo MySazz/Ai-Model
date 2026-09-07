@@ -57,6 +57,7 @@ def main() -> int:
         if not path.is_file():
             if not args.download:
                 raise SystemExit(f"Missing {path}; rerun with --download.")
+            # nosemgrep: dynamic-urllib-use-detected - pinned https://huggingface.co URLs from static SOURCES manifest
             with urllib.request.urlopen(str(source["url"]), timeout=120) as response:
                 path.write_bytes(response.read())
         source_paths[name] = path

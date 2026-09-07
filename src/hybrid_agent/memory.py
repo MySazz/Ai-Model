@@ -47,6 +47,7 @@ def _get_embedding(text: str) -> list[float]:
             ).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
+        # nosemgrep: dynamic-urllib-use-detected - localhost Ollama embed endpoint; scheme allowlisted to http(s) above
         with urllib.request.urlopen(req, timeout=2.0) as response:  # noqa: S310
             raw = response.read(MAX_EMBEDDING_RESPONSE_BYTES + 1)
             if len(raw) > MAX_EMBEDDING_RESPONSE_BYTES:

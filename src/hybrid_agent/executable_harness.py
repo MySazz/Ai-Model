@@ -1208,8 +1208,10 @@ def redact_secrets_eval_v3(module: Any) -> dict[str, bool]:
     """Evaluate deterministic secret redaction through a held-out interface."""
 
     def redacts_every_match() -> bool:
+        # nosemgrep: detected-aws-access-key-id-value - redaction-eval fixture: no real key material
         text = "token sk-abcdefgh12345678 and key AKIA1234567890ABCDEF"
         redacted = module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}", r"AKIA[A-Z0-9]{16}"])
+        # nosemgrep: detected-aws-access-key-id-value - redaction-eval fixture: no real key material
         return "sk-abcdefgh12345678" not in redacted and "AKIA1234567890ABCDEF" not in redacted
 
     def preserves_clean_text() -> bool:
@@ -1217,8 +1219,10 @@ def redact_secrets_eval_v3(module: Any) -> dict[str, bool]:
         return module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}"]) == text
 
     def handles_multiple_patterns() -> bool:
+        # nosemgrep: detected-aws-access-key-id-value - redaction-eval fixture: no real key material
         text = "user alice, token sk-abcdefgh12345678, key AKIA1234567890ABCDEF"
         redacted = module.redact_secrets(text, [r"sk-[A-Za-z0-9]{16,}", r"AKIA[A-Z0-9]{16}"])
+        # nosemgrep: detected-aws-access-key-id-value - redaction-eval fixture: no real key material
         return "alice" in redacted and "sk-abcdefgh12345678" not in redacted and "AKIA1234567890ABCDEF" not in redacted
 
     def deterministic_output() -> bool:
